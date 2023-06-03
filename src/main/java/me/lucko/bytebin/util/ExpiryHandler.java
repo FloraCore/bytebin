@@ -41,7 +41,7 @@ public final class ExpiryHandler {
     /**
      * Creates a new expiry handler.
      *
-     * @param lifetime the number of minutes before content should expire
+     * @param lifetime         the number of minutes before content should expire
      * @param lifetimeSpecific the number of minutes before content from certain sources should expire
      */
     public ExpiryHandler(long lifetime, Map<String, Long> lifetimeSpecific) {
@@ -50,6 +50,12 @@ public final class ExpiryHandler {
                 Map.Entry::getKey,
                 Functions.compose(ExpiryHandler::toDuration, Map.Entry::getValue))
         );
+    }
+
+    private static Duration toDuration(long minutes) {
+        // Duration.ZERO is used as a special case to mean "don't expire"
+        // it is assumed that a negative number of minutes implies the same.
+        return minutes > 0 ? Duration.ofMinutes(minutes) : Duration.ZERO;
     }
 
     /**
@@ -65,8 +71,8 @@ public final class ExpiryHandler {
      * Gets the expiry time to use for a piece of submitted content with the given parameters.
      *
      * @param userAgent the user agent of the client that posted the content
-     * @param origin the origin of the client that posted the content
-     * @param host the host that was used when posting the content
+     * @param origin    the origin of the client that posted the content
+     * @param host      the host that was used when posting the content
      * @return the expiry time, or {@link Instant#MAX} if it should never expire
      */
     public Date getExpiry(String userAgent, String origin, String host) {
@@ -82,12 +88,6 @@ public final class ExpiryHandler {
         }
 
         return new Date(Instant.now().plus(duration).toEpochMilli());
-    }
-
-    private static Duration toDuration(long minutes) {
-        // Duration.ZERO is used as a special case to mean "don't expire"
-        // it is assumed that a negative number of minutes implies the same.
-        return minutes > 0 ? Duration.ofMinutes(minutes) : Duration.ZERO;
     }
 
 }

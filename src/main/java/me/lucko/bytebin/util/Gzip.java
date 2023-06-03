@@ -34,7 +34,8 @@ import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 
 public final class Gzip {
-    private Gzip() {}
+    private Gzip() {
+    }
 
     public static byte[] compress(byte[] buf) {
         ByteArrayOutputStream out = new ByteArrayOutputStream(buf.length);

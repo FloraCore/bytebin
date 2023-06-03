@@ -15,5 +15,5 @@ services:
       BYTEBIN_CONTENT_MAXSIZE: 5
 
 volumes:
-  data: {}
-  db: {}
+  data: { }
+  db: { }

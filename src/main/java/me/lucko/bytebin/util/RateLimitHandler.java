@@ -36,7 +36,7 @@ import java.util.Set;
 
 /**
  * Handles rate limit checking for the application.
- *
+ * <p>
  * Trusted server-side applications making requests to bytebin on
  * behalf of other clients can authenticate using an API key and provide
  * the client's IP address using an HTTP header. In this case, the client IP

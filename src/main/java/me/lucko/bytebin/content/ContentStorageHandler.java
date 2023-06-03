@@ -61,16 +61,24 @@ public class ContentStorageHandler implements CacheLoader<String, Content> {
             .help("Counts the number of times content was written to the backend")
             .register();
 
-    /** An index of all stored content */
+    /**
+     * An index of all stored content
+     */
     private final ContentIndexDatabase index;
 
-    /** The backends in use for content storage */
+    /**
+     * The backends in use for content storage
+     */
     private final Map<String, StorageBackend> backends;
 
-    /** The function used to select which backend to use for content storage */
+    /**
+     * The function used to select which backend to use for content storage
+     */
     private final StorageBackendSelector backendSelector;
 
-    /** The executor to use for i/o */
+    /**
+     * The executor to use for i/o
+     */
     private final ScheduledExecutorService executor;
 
     public ContentStorageHandler(ContentIndexDatabase contentIndex, Collection<StorageBackend> backends, StorageBackendSelector backendSelector, ScheduledExecutorService executor) {

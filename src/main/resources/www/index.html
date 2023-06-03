@@ -65,7 +65,9 @@
         }
     </style>
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/pako/2.0.3/pako_deflate.min.js" integrity="sha512-1LtY6ivTYdyp7yVk1N3ZW2wHWT+nA36dWhLNmg5FORFhEAMPdDXG30E1KeeZDYO9659MYjQBIqWEL9EnNOBb4w==" crossorigin="anonymous"></script>
+    <script crossorigin="anonymous"
+            integrity="sha512-1LtY6ivTYdyp7yVk1N3ZW2wHWT+nA36dWhLNmg5FORFhEAMPdDXG30E1KeeZDYO9659MYjQBIqWEL9EnNOBb4w=="
+            src="https://cdnjs.cloudflare.com/ajax/libs/pako/2.0.3/pako_deflate.min.js"></script>
 
     <script type="text/javascript">
         function submit() {
@@ -80,7 +82,7 @@
             xhr.open("POST", "post", true);
             xhr.setRequestHeader("Content-Type", "text/plain");
             xhr.setRequestHeader("Content-Encoding", "gzip");
-            xhr.onreadystatechange = function() {
+            xhr.onreadystatechange = function () {
                 if (this.readyState === XMLHttpRequest.DONE && this.status === 201) {
                     window.location.href = JSON.parse(this.response).key;
                 }
@@ -97,7 +99,8 @@
     <a href="https://github.com/lucko/bytebin" target="_blank">[about bytebin]</a>
 </div>
 <div id="content-wrapper">
-    <textarea autofocus id="content" spellcheck="false" placeholder="Type or paste your content here, then click 'upload'..."></textarea>
+    <textarea autofocus id="content" placeholder="Type or paste your content here, then click 'upload'..."
+              spellcheck="false"></textarea>
 </div>
 </body>
 </html>

@@ -59,7 +59,9 @@ public class S3Backend implements StorageBackend {
 
     private static final Logger LOGGER = LogManager.getLogger(S3Backend.class);
 
-    /** The id of the backend */
+    /**
+     * The id of the backend
+     */
     private final String backendId;
 
     private final String bucketName;
@@ -78,6 +80,35 @@ public class S3Backend implements StorageBackend {
         }
 
         this.client = builder.build();
+    }
+
+    private static Map<String, String> writeMetadata(Content c) {
+        Map<String, String> meta = new HashMap<>();
+        meta.put("bytebin-version", "1");
+        meta.put("bytebin-contenttype", c.getContentType());
+        meta.put("bytebin-expiry", Long.toString(c.getExpiry() == null ? -1 : c.getExpiry().getTime()));
+        meta.put("bytebin-lastmodified", Long.toString(c.getLastModified()));
+        meta.put("bytebin-modifiable", Boolean.toString(c.isModifiable()));
+        if (c.isModifiable()) {
+            meta.put("bytebin-authkey", c.getAuthKey());
+        }
+        meta.put("bytebin-encoding", c.getEncoding());
+        return meta;
+    }
+
+    private static Content read(String key, Map<String, String> meta, byte[] buf) {
+        //int version = Integer.parseInt(meta.get("bytebin-version"));
+        String contentType = meta.get("bytebin-contenttype");
+        long expiry = Long.parseLong(meta.get("bytebin-expiry"));
+        Date expiryDate = expiry == -1 ? null : new Date(expiry);
+        long lastModified = Long.parseLong(meta.get("bytebin-lastmodified"));
+        boolean modifiable = Boolean.parseBoolean(meta.get("bytebin-modifiable"));
+        String authKey = null;
+        if (modifiable) {
+            authKey = meta.get("bytebin-authkey");
+        }
+        String encoding = meta.get("bytebin-encoding");
+        return new Content(key, contentType, expiryDate, lastModified, modifiable, authKey, encoding, buf);
     }
 
     @Override
@@ -137,52 +168,23 @@ public class S3Backend implements StorageBackend {
                 .build()
         );
         return iter.stream().flatMap(resp -> resp.contents().stream()
-                .map(object -> {
-                    String key = object.key();
-                    try {
-                        HeadObjectResponse objectResp = this.client.headObject(HeadObjectRequest.builder()
-                                .bucket(this.bucketName)
-                                .key(key)
-                                .build()
-                        );
-                        Content content = read(key, objectResp.metadata(), Content.EMPTY_BYTES);
-                        content.setBackendId(this.backendId);
-                        content.setContentLength(objectResp.contentLength().intValue());
-                        return content;
-                    } catch (Exception e) {
-                        LOGGER.error("Exception occurred loading meta for '" + key + "'", e);
-                        return null;
-                    }
-                }))
+                        .map(object -> {
+                            String key = object.key();
+                            try {
+                                HeadObjectResponse objectResp = this.client.headObject(HeadObjectRequest.builder()
+                                        .bucket(this.bucketName)
+                                        .key(key)
+                                        .build()
+                                );
+                                Content content = read(key, objectResp.metadata(), Content.EMPTY_BYTES);
+                                content.setBackendId(this.backendId);
+                                content.setContentLength(objectResp.contentLength().intValue());
+                                return content;
+                            } catch (Exception e) {
+                                LOGGER.error("Exception occurred loading meta for '" + key + "'", e);
+                                return null;
+                            }
+                        }))
                 .filter(Objects::nonNull);
-    }
-
-    private static Map<String, String> writeMetadata(Content c) {
-        Map<String, String> meta = new HashMap<>();
-        meta.put("bytebin-version", "1");
-        meta.put("bytebin-contenttype", c.getContentType());
-        meta.put("bytebin-expiry", Long.toString(c.getExpiry() == null ? -1 : c.getExpiry().getTime()));
-        meta.put("bytebin-lastmodified", Long.toString(c.getLastModified()));
-        meta.put("bytebin-modifiable", Boolean.toString(c.isModifiable()));
-        if (c.isModifiable()) {
-            meta.put("bytebin-authkey", c.getAuthKey());
-        }
-        meta.put("bytebin-encoding", c.getEncoding());
-        return meta;
-    }
-
-    private static Content read(String key, Map<String, String> meta, byte[] buf) {
-        //int version = Integer.parseInt(meta.get("bytebin-version"));
-        String contentType = meta.get("bytebin-contenttype");
-        long expiry = Long.parseLong(meta.get("bytebin-expiry"));
-        Date expiryDate = expiry == -1 ? null : new Date(expiry);
-        long lastModified = Long.parseLong(meta.get("bytebin-lastmodified"));
-        boolean modifiable = Boolean.parseBoolean(meta.get("bytebin-modifiable"));
-        String authKey = null;
-        if (modifiable) {
-            authKey = meta.get("bytebin-authkey");
-        }
-        String encoding = meta.get("bytebin-encoding");
-        return new Content(key, contentType, expiryDate, lastModified, modifiable, authKey, encoding, buf);
     }
 }

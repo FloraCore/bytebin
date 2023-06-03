@@ -38,13 +38,12 @@ import java.util.Set;
 import java.util.regex.Pattern;
 
 public final class ContentEncoding {
-    private ContentEncoding() {}
-
     public static final String GZIP = "gzip";
     public static final String IDENTITY = "identity";
-
     private static final Splitter COMMA_SPLITTER = Splitter.on(Pattern.compile(",\\s*"));
     private static final Pattern RE_SEMICOLON = Pattern.compile(";\\s*");
+    private ContentEncoding() {
+    }
 
     public static Set<String> getAcceptedEncoding(Context ctx) {
         String header = ctx.header("Accept-Encoding").valueOrNull();

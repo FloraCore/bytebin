@@ -54,15 +54,15 @@ import javax.annotation.Nonnull;
 
 public final class PostHandler implements Route.Handler {
 
-    /** Logger instance */
-    private static final Logger LOGGER = LogManager.getLogger(PostHandler.class);
-
     public static final Summary CONTENT_SIZE_SUMMARY = Summary.build()
             .name("bytebin_content_size_bytes")
             .help("The size of posted content")
             .labelNames("useragent")
             .register();
-
+    /**
+     * Logger instance
+     */
+    private static final Logger LOGGER = LogManager.getLogger(PostHandler.class);
     private final BytebinServer server;
     private final RateLimiter rateLimiter;
     private final RateLimitHandler rateLimitHandler;

@@ -55,7 +55,9 @@ import java.util.concurrent.CompletionException;
 
 public class BytebinServer extends Jooby {
 
-    /** Logger instance */
+    /**
+     * Logger instance
+     */
     private static final Logger LOGGER = LogManager.getLogger(BytebinServer.class);
 
     private static final Counter REQUESTS_COUNTER = Counter.build()
@@ -97,7 +99,9 @@ public class BytebinServer extends Jooby {
         });
 
         AssetSource wwwFiles = AssetSource.create(Bytebin.class.getClassLoader(), "/www/");
-        AssetSource fourOhFour = path -> { throw new StatusCodeException(StatusCode.NOT_FOUND, "Not found"); };
+        AssetSource fourOhFour = path -> {
+            throw new StatusCodeException(StatusCode.NOT_FOUND, "Not found");
+        };
 
         // serve index page or favicon, otherwise 404
         assets("/*", new AssetHandler(wwwFiles, fourOhFour).setMaxAge(Duration.ofDays(1)));

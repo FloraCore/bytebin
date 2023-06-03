@@ -50,7 +50,7 @@ public interface ContentLoader {
     /**
      * Adds a newly submitted entry to the loader cache.
      *
-     * @param key the key
+     * @param key    the key
      * @param future a future encapsulating the content
      */
     void put(String key, CompletableFuture<Content> future);

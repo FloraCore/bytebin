@@ -54,7 +54,7 @@ import java.util.stream.Collectors;
 
 /**
  * The content index is a database storing metadata about the content stored in bytebin.
- *
+ * <p>
  * It is merely an index, and can be regenerated at any time from the raw data (stored in the backend).
  * The primary use is to track content expiry times, and to determine which backend bytebin should
  * read from if the content isn't already cached in memory. It is also used for metrics.
@@ -74,6 +74,13 @@ public class ContentIndexDatabase implements AutoCloseable {
             .help("The size of stored content")
             .labelNames("type", "backend")
             .register();
+    private final ConnectionSource connectionSource;
+    private final Dao<Content, String> dao;
+    public ContentIndexDatabase() throws SQLException {
+        this.connectionSource = new JdbcConnectionSource("jdbc:sqlite:db/bytebin.db");
+        TableUtils.createTableIfNotExists(this.connectionSource, Content.class);
+        this.dao = DaoManager.createDao(this.connectionSource, Content.class);
+    }
 
     public static ContentIndexDatabase initialise(Collection<StorageBackend> backends) throws SQLException {
         // ensure the db directory exists, sqlite won't create it
@@ -97,15 +104,6 @@ public class ContentIndexDatabase implements AutoCloseable {
             }
         }
         return database;
-    }
-
-    private final ConnectionSource connectionSource;
-    private final Dao<Content, String> dao;
-
-    public ContentIndexDatabase() throws SQLException {
-        this.connectionSource = new JdbcConnectionSource("jdbc:sqlite:db/bytebin.db");
-        TableUtils.createTableIfNotExists(this.connectionSource, Content.class);
-        this.dao = DaoManager.createDao(this.connectionSource, Content.class);
     }
 
     public void put(Content content) {
@@ -154,8 +152,6 @@ public class ContentIndexDatabase implements AutoCloseable {
         }
     }
 
-    record ContentStorageKeys(String contentType, String backend) { }
-
     private Map<ContentStorageKeys, Long> queryStringToIntMap(String returnExpr) {
         try {
             Map<ContentStorageKeys, Long> map = new HashMap<>();
@@ -188,5 +184,8 @@ public class ContentIndexDatabase implements AutoCloseable {
     @Override
     public void close() throws Exception {
         this.connectionSource.close();
+    }
+
+    record ContentStorageKeys(String contentType, String backend) {
     }
 }

@@ -49,6 +49,12 @@ import java.util.stream.StreamSupport;
  */
 public class Configuration {
 
+    private final JsonObject jsonObject;
+
+    public Configuration(JsonObject jsonObject) {
+        this.jsonObject = jsonObject;
+    }
+
     public static Configuration load(Path configPath) throws IOException {
         Configuration config;
         if (Files.exists(configPath)) {
@@ -59,12 +65,6 @@ public class Configuration {
             config = new Configuration(new JsonObject());
         }
         return config;
-    }
-
-    private final JsonObject jsonObject;
-
-    public Configuration(JsonObject jsonObject) {
-        this.jsonObject = jsonObject;
     }
 
     private <T> T get(Option option, T def, Function<String, T> parser, Function<JsonElement, T> jsonParser) {

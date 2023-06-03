@@ -51,7 +51,9 @@ import javax.annotation.Nonnull;
 
 public final class PutHandler implements Route.Handler {
 
-    /** Logger instance */
+    /**
+     * Logger instance
+     */
     private static final Logger LOGGER = LogManager.getLogger(PutHandler.class);
 
     private final BytebinServer server;

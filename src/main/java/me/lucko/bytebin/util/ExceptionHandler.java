@@ -31,7 +31,9 @@ import org.apache.logging.log4j.Logger;
 public class ExceptionHandler implements Thread.UncaughtExceptionHandler {
     public static final ExceptionHandler INSTANCE = new ExceptionHandler();
 
-    /** Logger instance */
+    /**
+     * Logger instance
+     */
     private static final Logger LOGGER = LogManager.getLogger(ExceptionHandler.class);
 
     @Override

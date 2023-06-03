@@ -38,57 +38,74 @@ import java.util.concurrent.CompletableFuture;
 @DatabaseTable(tableName = "content")
 public final class Content {
 
-    /** Empty byte array */
+    /**
+     * Empty byte array
+     */
     public static final byte[] EMPTY_BYTES = new byte[0];
 
-    /** Empty content instance */
+    /**
+     * Empty content instance
+     */
     public static final Content EMPTY_CONTENT = new Content(null, "text/plain", null, Long.MIN_VALUE, false, null, "", EMPTY_BYTES);
 
-    /** Number of bytes in a megabyte */
+    /**
+     * Number of bytes in a megabyte
+     */
     public static final long MEGABYTE_LENGTH = 1024L * 1024L;
 
-    /** Number of bytes in a kilobyte */
+    /**
+     * Number of bytes in a kilobyte
+     */
     public static final long KILOBYTE_LENGTH = 1024L;
-
-    /** The key used to identify the content */
-    @DatabaseField(columnName = "key", id = true, canBeNull = false)
-    private String key;
-
-    /** The type of the content */
-    @DatabaseField(columnName = "content_type", index = true)
-    private String contentType;
-
-    /** The time when the content will expire */
-    @DatabaseField(columnName = "expiry", dataType = DataType.DATE_INTEGER, index = true)
-    private Date expiry;
-
-    /** The time when the content was last modified in unix millis */
-    @DatabaseField(columnName = "last_modified")
-    private long lastModified;
-
-    /** If the content can be modified using PUT requests */
-    private boolean modifiable;
-
-    /** The auth key required to modify the content */
-    private String authKey;
-
-    /** The 'Content-Encoding' used to encode this content */
-    @DatabaseField(columnName = "encoding")
-    private String encoding;
-
-    /** The id of the backend currently storing this content - use null for unknown */
-    @DatabaseField(columnName = "backend_id")
-    private String backendId;
-
-    /** The actual content, optional */
-    private byte[] content;
-
-    /** The length of the content */
-    @DatabaseField(columnName = "content_length")
-    private int contentLength;
-
     // future that is completed after the content has been saved to disk
     private final CompletableFuture<Void> saveFuture = new CompletableFuture<>();
+    /**
+     * The key used to identify the content
+     */
+    @DatabaseField(columnName = "key", id = true, canBeNull = false)
+    private String key;
+    /**
+     * The type of the content
+     */
+    @DatabaseField(columnName = "content_type", index = true)
+    private String contentType;
+    /**
+     * The time when the content will expire
+     */
+    @DatabaseField(columnName = "expiry", dataType = DataType.DATE_INTEGER, index = true)
+    private Date expiry;
+    /**
+     * The time when the content was last modified in unix millis
+     */
+    @DatabaseField(columnName = "last_modified")
+    private long lastModified;
+    /**
+     * If the content can be modified using PUT requests
+     */
+    private boolean modifiable;
+    /**
+     * The auth key required to modify the content
+     */
+    private String authKey;
+    /**
+     * The 'Content-Encoding' used to encode this content
+     */
+    @DatabaseField(columnName = "encoding")
+    private String encoding;
+    /**
+     * The id of the backend currently storing this content - use null for unknown
+     */
+    @DatabaseField(columnName = "backend_id")
+    private String backendId;
+    /**
+     * The actual content, optional
+     */
+    private byte[] content;
+    /**
+     * The length of the content
+     */
+    @DatabaseField(columnName = "content_length")
+    private int contentLength;
 
     public Content(String key, String contentType, Date expiry, long lastModified, boolean modifiable, String authKey, String encoding, byte[] content) {
         this.key = key;

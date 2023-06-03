@@ -52,10 +52,14 @@ public class LocalDiskBackend implements StorageBackend {
 
     private static final Logger LOGGER = LogManager.getLogger(LocalDiskBackend.class);
 
-    /** The id of the backend */
+    /**
+     * The id of the backend
+     */
     private final String backendId;
 
-    /** The path to the directory where the content is stored */
+    /**
+     * The path to the directory where the content is stored
+     */
     private final Path contentPath;
 
     public LocalDiskBackend(String backendId, Path contentPath) throws IOException {
@@ -64,66 +68,6 @@ public class LocalDiskBackend implements StorageBackend {
 
         // initialise
         Files.createDirectories(this.contentPath);
-    }
-
-    @Override
-    public String getBackendId() {
-        return this.backendId;
-    }
-
-    private Content load(Path resolved, boolean skipContent) throws IOException {
-        if (!Files.exists(resolved)) {
-            return null;
-        }
-
-        try (DataInputStream in = new DataInputStream(new BufferedInputStream(Files.newInputStream(resolved)))) {
-            Content content = read(in, skipContent);
-            content.setBackendId(this.backendId);
-            return content;
-        }
-    }
-
-    @Override
-    public Content load(String key) throws IOException {
-        Path path = this.contentPath.resolve(key);
-        return load(path, false);
-    }
-
-    @Override
-    public void save(Content c) throws IOException {
-        Path path = this.contentPath.resolve(c.getKey());
-        try (BufferedOutputStream out = new BufferedOutputStream(Files.newOutputStream(path))) {
-            write(c, out);
-        }
-    }
-
-    @Override
-    public Stream<String> listKeys() throws Exception {
-        return Files.list(this.contentPath).map(path -> path.getFileName().toString());
-    }
-
-    @Override
-    public Stream<Content> list() throws IOException {
-        return Files.list(this.contentPath)
-                .map(path -> {
-                    try {
-                        return load(path, true);
-                    } catch (IOException e) {
-                        LOGGER.error("Exception occurred loading meta for '" + path.getFileName().toString() + "'", e);
-                        return null;
-                    }
-                })
-                .filter(Objects::nonNull);
-    }
-
-    @Override
-    public void delete(String key) throws IOException {
-        Path path = this.contentPath.resolve(key);
-        try {
-            Files.delete(path);
-        } catch (NoSuchFileException e) {
-            // ignore
-        }
     }
 
     private static void write(Content c, OutputStream outputStream) throws IOException {
@@ -213,6 +157,66 @@ public class LocalDiskBackend implements StorageBackend {
             return new Content(key, contentType, expiryDate, lastModified, modifiable, authKey, encoding, content);
         }
 
+    }
+
+    @Override
+    public String getBackendId() {
+        return this.backendId;
+    }
+
+    private Content load(Path resolved, boolean skipContent) throws IOException {
+        if (!Files.exists(resolved)) {
+            return null;
+        }
+
+        try (DataInputStream in = new DataInputStream(new BufferedInputStream(Files.newInputStream(resolved)))) {
+            Content content = read(in, skipContent);
+            content.setBackendId(this.backendId);
+            return content;
+        }
+    }
+
+    @Override
+    public Content load(String key) throws IOException {
+        Path path = this.contentPath.resolve(key);
+        return load(path, false);
+    }
+
+    @Override
+    public void save(Content c) throws IOException {
+        Path path = this.contentPath.resolve(c.getKey());
+        try (BufferedOutputStream out = new BufferedOutputStream(Files.newOutputStream(path))) {
+            write(c, out);
+        }
+    }
+
+    @Override
+    public Stream<String> listKeys() throws Exception {
+        return Files.list(this.contentPath).map(path -> path.getFileName().toString());
+    }
+
+    @Override
+    public Stream<Content> list() throws IOException {
+        return Files.list(this.contentPath)
+                .map(path -> {
+                    try {
+                        return load(path, true);
+                    } catch (IOException e) {
+                        LOGGER.error("Exception occurred loading meta for '" + path.getFileName().toString() + "'", e);
+                        return null;
+                    }
+                })
+                .filter(Objects::nonNull);
+    }
+
+    @Override
+    public void delete(String key) throws IOException {
+        Path path = this.contentPath.resolve(key);
+        try {
+            Files.delete(path);
+        } catch (NoSuchFileException e) {
+            // ignore
+        }
     }
 
 }

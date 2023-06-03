@@ -67,7 +67,9 @@ import java.util.concurrent.TimeUnit;
  */
 public final class Bytebin implements AutoCloseable {
 
-    /** Logger instance */
+    /**
+     * Logger instance
+     */
     private static final Logger LOGGER;
 
     static {
@@ -75,28 +77,14 @@ public final class Bytebin implements AutoCloseable {
         LOGGER = LogManager.getLogger(Bytebin.class);
     }
 
-    // Bootstrap
-    public static void main(String[] args) throws Exception {
-        // setup logging
-        System.setOut(IoBuilder.forLogger(LOGGER).setLevel(Level.INFO).buildPrintStream());
-        System.setErr(IoBuilder.forLogger(LOGGER).setLevel(Level.ERROR).buildPrintStream());
-
-        // setup a new bytebin instance
-        Configuration config = Configuration.load(Paths.get("config.json"));
-        try {
-            Bytebin bytebin = new Bytebin(config);
-            Runtime.getRuntime().addShutdownHook(new Thread(bytebin::close, "Bytebin Shutdown Thread"));
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-    }
-
-    /** Executor service for performing file based i/o */
+    /**
+     * Executor service for performing file based i/o
+     */
     private final ScheduledExecutorService executor;
-
     private final ContentIndexDatabase indexDatabase;
-
-    /** The web server instance */
+    /**
+     * The web server instance
+     */
     private final BytebinServer server;
 
     public Bytebin(Configuration config) throws Exception {
@@ -191,6 +179,22 @@ public final class Bytebin implements AutoCloseable {
 
         if (config.getBoolean(Option.AUDIT_ON_STARTUP, false)) {
             this.executor.execute(new AuditTask(this.indexDatabase, storageBackends));
+        }
+    }
+
+    // Bootstrap
+    public static void main(String[] args) throws Exception {
+        // setup logging
+        System.setOut(IoBuilder.forLogger(LOGGER).setLevel(Level.INFO).buildPrintStream());
+        System.setErr(IoBuilder.forLogger(LOGGER).setLevel(Level.ERROR).buildPrintStream());
+
+        // setup a new bytebin instance
+        Configuration config = Configuration.load(Paths.get("config.json"));
+        try {
+            Bytebin bytebin = new Bytebin(config);
+            Runtime.getRuntime().addShutdownHook(new Thread(bytebin::close, "Bytebin Shutdown Thread"));
+        } catch (Exception e) {
+            e.printStackTrace();
         }
     }
 
