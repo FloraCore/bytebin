@@ -26,7 +26,6 @@
 package me.lucko.bytebin.util;
 
 import com.google.common.collect.ImmutableSet;
-
 import io.jooby.Context;
 import io.jooby.StatusCode;
 import io.jooby.exception.StatusCodeException;
@@ -43,40 +42,40 @@ import java.util.Set;
  * address will be used for rate limiting purposes instead.
  */
 public final class RateLimitHandler {
-    private static final String HEADER_FORWARDED_IP = "Bytebin-Forwarded-For";
-    private static final String HEADER_API_KEY = "Bytebin-Api-Key";
+	private static final String HEADER_FORWARDED_IP = "Bytebin-Forwarded-For";
+	private static final String HEADER_API_KEY = "Bytebin-Api-Key";
 
-    private final Set<String> apiKeys;
+	private final Set<String> apiKeys;
 
-    public RateLimitHandler(Collection<String> apiKeys) {
-        this.apiKeys = ImmutableSet.copyOf(apiKeys);
-    }
+	public RateLimitHandler(Collection<String> apiKeys) {
+		this.apiKeys = ImmutableSet.copyOf(apiKeys);
+	}
 
-    public String getIpAddressAndCheckRateLimit(Context ctx, RateLimiter limiter) {
-        // get the connection IP address according to cloudflare, fallback to
-        // the remote address
-        String ipAddress = ctx.header("x-real-ip").valueOrNull();
-        if (ipAddress == null) {
-            ipAddress = ctx.getRemoteAddress();
-        }
+	public String getIpAddressAndCheckRateLimit(Context ctx, RateLimiter limiter) {
+		// get the connection IP address according to cloudflare, fallback to
+		// the remote address
+		String ipAddress = ctx.header("x-real-ip").valueOrNull();
+		if (ipAddress == null) {
+			ipAddress = ctx.getRemoteAddress();
+		}
 
-        // if an API key has been specified, ensure it is valid, then replace
-        // the IP address with the one specified by the forwarded-for header.
-        String apiKey = ctx.header(HEADER_API_KEY).value("");
-        if (!apiKey.isEmpty()) {
-            if (!this.apiKeys.contains(apiKey)) {
-                throw new StatusCodeException(StatusCode.UNAUTHORIZED, "API key is invalid");
-            }
+		// if an API key has been specified, ensure it is valid, then replace
+		// the IP address with the one specified by the forwarded-for header.
+		String apiKey = ctx.header(HEADER_API_KEY).value("");
+		if (!apiKey.isEmpty()) {
+			if (!this.apiKeys.contains(apiKey)) {
+				throw new StatusCodeException(StatusCode.UNAUTHORIZED, "API key is invalid");
+			}
 
-            ipAddress = ctx.header(HEADER_FORWARDED_IP).value(ipAddress);
-        }
+			ipAddress = ctx.header(HEADER_FORWARDED_IP).value(ipAddress);
+		}
 
-        // check rate limits
-        if (limiter.check(ipAddress)) {
-            throw new StatusCodeException(StatusCode.TOO_MANY_REQUESTS, "Rate limit exceeded");
-        }
+		// check rate limits
+		if (limiter.check(ipAddress)) {
+			throw new StatusCodeException(StatusCode.TOO_MANY_REQUESTS, "Rate limit exceeded");
+		}
 
-        return ipAddress;
-    }
+		return ipAddress;
+	}
 
 }

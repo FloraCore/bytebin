@@ -36,79 +36,79 @@ import java.util.Date;
  */
 public interface StorageBackendSelector {
 
-    /**
-     * Select which backend to store {@code content} in.
-     *
-     * @param content the content
-     * @return the selected backend
-     */
-    StorageBackend select(Content content);
+	/**
+	 * Select which backend to store {@code content} in.
+	 *
+	 * @param content the content
+	 * @return the selected backend
+	 */
+	StorageBackend select(Content content);
 
-    final class Static implements StorageBackendSelector {
-        private final StorageBackend backend;
+	final class Static implements StorageBackendSelector {
+		private final StorageBackend backend;
 
-        public Static(StorageBackend backend) {
-            this.backend = backend;
-        }
+		public Static(StorageBackend backend) {
+			this.backend = backend;
+		}
 
-        @Override
-        public StorageBackend select(Content content) {
-            return this.backend;
-        }
-    }
+		@Override
+		public StorageBackend select(Content content) {
+			return this.backend;
+		}
+	}
 
-    abstract class Dynamic implements StorageBackendSelector {
-        private final StorageBackendSelector next;
-        private final StorageBackend backend;
+	abstract class Dynamic implements StorageBackendSelector {
+		private final StorageBackendSelector next;
+		private final StorageBackend backend;
 
-        protected Dynamic(StorageBackend backend, StorageBackendSelector next) {
-            this.next = next;
-            this.backend = backend;
-        }
+		protected Dynamic(StorageBackend backend, StorageBackendSelector next) {
+			this.next = next;
+			this.backend = backend;
+		}
 
-        @Override
-        public StorageBackend select(Content content) {
-            if (test(content)) {
-                return this.backend;
-            }
-            return this.next.select(content);
-        }
+		@Override
+		public StorageBackend select(Content content) {
+			if (test(content)) {
+				return this.backend;
+			}
+			return this.next.select(content);
+		}
 
-        protected abstract boolean test(Content content);
-    }
+		protected abstract boolean test(Content content);
+	}
 
-    final class IfSizeGt extends Dynamic {
-        private final long threshold; // bytes
+	final class IfSizeGt extends Dynamic {
+		private final long threshold; // bytes
 
-        public IfSizeGt(long threshold, StorageBackend backend, StorageBackendSelector next) {
-            super(backend, next);
-            this.threshold = threshold;
-        }
+		public IfSizeGt(long threshold, StorageBackend backend, StorageBackendSelector next) {
+			super(backend, next);
+			this.threshold = threshold;
+		}
 
-        @Override
-        protected boolean test(Content content) {
-            return content.getContentLength() > this.threshold;
-        }
-    }
+		@Override
+		protected boolean test(Content content) {
+			return content.getContentLength() > this.threshold;
+		}
+	}
 
-    final class IfExpiryGt extends Dynamic {
-        private final int threshold; // minutes
+	final class IfExpiryGt extends Dynamic {
+		private final int threshold; // minutes
 
-        public IfExpiryGt(int threshold, StorageBackend backend, StorageBackendSelector next) {
-            super(backend, next);
-            this.threshold = threshold;
-        }
+		public IfExpiryGt(int threshold, StorageBackend backend, StorageBackendSelector next) {
+			super(backend, next);
+			this.threshold = threshold;
+		}
 
-        @Override
-        protected boolean test(Content content) {
-            Date expiry = content.getExpiry();
-            if (expiry == null) {
-                return true;
-            }
+		@Override
+		protected boolean test(Content content) {
+			Date expiry = content.getExpiry();
+			if (expiry == null) {
+				return true;
+			}
 
-            long timeToExpiry = Duration.between(Instant.now(), expiry.toInstant()).getSeconds() / 60;
-            return timeToExpiry > this.threshold;
-        }
-    }
+			long timeToExpiry = Duration.between(Instant.now(), expiry.toInstant()).getSeconds() / 60;
+			return timeToExpiry > this.threshold;
+		}
+	}
 
 }

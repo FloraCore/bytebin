@@ -39,87 +39,87 @@ import java.util.concurrent.TimeUnit;
  */
 public interface ContentLoader {
 
-    static ContentLoader create(ContentStorageHandler storageHandler, int cacheTimeMins, int cacheMaxSizeMb) {
-        if (cacheTimeMins > 0 && cacheMaxSizeMb > 0) {
-            return new CachedContentLoader(storageHandler, cacheTimeMins, cacheMaxSizeMb);
-        } else {
-            return new DirectContentLoader(storageHandler);
-        }
-    }
+	static ContentLoader create(ContentStorageHandler storageHandler, int cacheTimeMins, int cacheMaxSizeMb) {
+		if (cacheTimeMins > 0 && cacheMaxSizeMb > 0) {
+			return new CachedContentLoader(storageHandler, cacheTimeMins, cacheMaxSizeMb);
+		} else {
+			return new DirectContentLoader(storageHandler);
+		}
+	}
 
-    /**
-     * Adds a newly submitted entry to the loader cache.
-     *
-     * @param key    the key
-     * @param future a future encapsulating the content
-     */
-    void put(String key, CompletableFuture<Content> future);
+	/**
+	 * Adds a newly submitted entry to the loader cache.
+	 *
+	 * @param key    the key
+	 * @param future a future encapsulating the content
+	 */
+	void put(String key, CompletableFuture<Content> future);
 
-    /**
-     * Gets an entry from the loader.
-     *
-     * @param key the key
-     * @return a future encapsulating the content
-     */
-    CompletableFuture<? extends Content> get(String key);
+	/**
+	 * Gets an entry from the loader.
+	 *
+	 * @param key the key
+	 * @return a future encapsulating the content
+	 */
+	CompletableFuture<? extends Content> get(String key);
 
-    /**
-     * A {@link ContentLoader} backed by a cache.
-     */
-    final class CachedContentLoader implements ContentLoader {
-        private final AsyncLoadingCache<String, Content> cache;
+	/**
+	 * A {@link ContentLoader} backed by a cache.
+	 */
+	final class CachedContentLoader implements ContentLoader {
+		private final AsyncLoadingCache<String, Content> cache;
 
-        CachedContentLoader(ContentStorageHandler storageHandler, int cacheTimeMins, int cacheMaxSizeMb) {
-            this.cache = Caffeine.newBuilder()
-                    .executor(storageHandler.getExecutor())
-                    .expireAfterAccess(cacheTimeMins, TimeUnit.MINUTES)
-                    .maximumWeight(cacheMaxSizeMb * Content.MEGABYTE_LENGTH)
-                    .weigher((Weigher<String, Content>) (path, content) -> content.getContent().length)
-                    .buildAsync(storageHandler);
-        }
+		CachedContentLoader(ContentStorageHandler storageHandler, int cacheTimeMins, int cacheMaxSizeMb) {
+			this.cache = Caffeine.newBuilder()
+					.executor(storageHandler.getExecutor())
+					.expireAfterAccess(cacheTimeMins, TimeUnit.MINUTES)
+					.maximumWeight(cacheMaxSizeMb * Content.MEGABYTE_LENGTH)
+					.weigher((Weigher<String, Content>) (path, content) -> content.getContent().length)
+					.buildAsync(storageHandler);
+		}
 
-        @Override
-        public void put(String key, CompletableFuture<Content> future) {
-            this.cache.put(key, future);
-        }
+		@Override
+		public void put(String key, CompletableFuture<Content> future) {
+			this.cache.put(key, future);
+		}
 
-        @Override
-        public CompletableFuture<Content> get(String key) {
-            return this.cache.get(key);
-        }
-    }
+		@Override
+		public CompletableFuture<Content> get(String key) {
+			return this.cache.get(key);
+		}
+	}
 
-    /**
-     * A {@link ContentLoader} that makes requests directly to the storage handler with no caching.
-     */
-    final class DirectContentLoader implements ContentLoader {
-        private final ContentStorageHandler storageHandler;
-        private final Map<String, CompletableFuture<Content>> saveInProgress = new ConcurrentHashMap<>();
+	/**
+	 * A {@link ContentLoader} that makes requests directly to the storage handler with no caching.
+	 */
+	final class DirectContentLoader implements ContentLoader {
+		private final ContentStorageHandler storageHandler;
+		private final Map<String, CompletableFuture<Content>> saveInProgress = new ConcurrentHashMap<>();
 
-        DirectContentLoader(ContentStorageHandler storageHandler) {
-            this.storageHandler = storageHandler;
-        }
+		DirectContentLoader(ContentStorageHandler storageHandler) {
+			this.storageHandler = storageHandler;
+		}
 
-        @Override
-        public void put(String key, CompletableFuture<Content> future) {
-            if (future.isDone() && future.join().getSaveFuture().isDone()) {
-                return;
-            }
+		@Override
+		public void put(String key, CompletableFuture<Content> future) {
+			if (future.isDone() && future.join().getSaveFuture().isDone()) {
+				return;
+			}
 
-            // record in map while the save is in progress, then immediately remove
-            this.saveInProgress.put(key, future);
-            future.thenCompose(Content::getSaveFuture).thenRun(() -> this.saveInProgress.remove(key));
-        }
+			// record in map while the save is in progress, then immediately remove
+			this.saveInProgress.put(key, future);
+			future.thenCompose(Content::getSaveFuture).thenRun(() -> this.saveInProgress.remove(key));
+		}
 
-        @Override
-        public CompletableFuture<? extends Content> get(String key) {
-            CompletableFuture<Content> saveInProgressFuture = this.saveInProgress.get(key);
-            if (saveInProgressFuture != null) {
-                return saveInProgressFuture;
-            }
+		@Override
+		public CompletableFuture<? extends Content> get(String key) {
+			CompletableFuture<Content> saveInProgressFuture = this.saveInProgress.get(key);
+			if (saveInProgressFuture != null) {
+				return saveInProgressFuture;
+			}
 
-            return this.storageHandler.asyncLoad(key, this.storageHandler.getExecutor());
-        }
-    }
+			return this.storageHandler.asyncLoad(key, this.storageHandler.getExecutor());
+		}
+	}
 
 }

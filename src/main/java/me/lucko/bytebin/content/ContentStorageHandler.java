@@ -27,14 +27,11 @@ package me.lucko.bytebin.content;
 
 import com.github.benmanes.caffeine.cache.CacheLoader;
 import com.google.common.collect.ImmutableMap;
-
+import io.prometheus.client.Counter;
 import me.lucko.bytebin.content.storage.StorageBackend;
-
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.checkerframework.checker.nullness.qual.NonNull;
-
-import io.prometheus.client.Counter;
 
 import java.util.Collection;
 import java.util.Map;
@@ -47,150 +44,150 @@ import java.util.function.Function;
  */
 public class ContentStorageHandler implements CacheLoader<String, Content> {
 
-    private static final Logger LOGGER = LogManager.getLogger(ContentStorageHandler.class);
+	private static final Logger LOGGER = LogManager.getLogger(ContentStorageHandler.class);
 
-    private static final Counter READ_FROM_BACKEND_COUNTER = Counter.build()
-            .name("bytebin_backend_read_total")
-            .labelNames("backend")
-            .help("Counts the number of cache-misses when loading content")
-            .register();
+	private static final Counter READ_FROM_BACKEND_COUNTER = Counter.build()
+			.name("bytebin_backend_read_total")
+			.labelNames("backend")
+			.help("Counts the number of cache-misses when loading content")
+			.register();
 
-    private static final Counter WRITE_TO_BACKEND_COUNTER = Counter.build()
-            .name("bytebin_backend_write_total")
-            .labelNames("backend")
-            .help("Counts the number of times content was written to the backend")
-            .register();
+	private static final Counter WRITE_TO_BACKEND_COUNTER = Counter.build()
+			.name("bytebin_backend_write_total")
+			.labelNames("backend")
+			.help("Counts the number of times content was written to the backend")
+			.register();
 
-    /**
-     * An index of all stored content
-     */
-    private final ContentIndexDatabase index;
+	/**
+	 * An index of all stored content
+	 */
+	private final ContentIndexDatabase index;
 
-    /**
-     * The backends in use for content storage
-     */
-    private final Map<String, StorageBackend> backends;
+	/**
+	 * The backends in use for content storage
+	 */
+	private final Map<String, StorageBackend> backends;
 
-    /**
-     * The function used to select which backend to use for content storage
-     */
-    private final StorageBackendSelector backendSelector;
+	/**
+	 * The function used to select which backend to use for content storage
+	 */
+	private final StorageBackendSelector backendSelector;
 
-    /**
-     * The executor to use for i/o
-     */
-    private final ScheduledExecutorService executor;
+	/**
+	 * The executor to use for i/o
+	 */
+	private final ScheduledExecutorService executor;
 
-    public ContentStorageHandler(ContentIndexDatabase contentIndex, Collection<StorageBackend> backends, StorageBackendSelector backendSelector, ScheduledExecutorService executor) {
-        this.index = contentIndex;
-        this.backends = backends.stream().collect(ImmutableMap.toImmutableMap(
-                StorageBackend::getBackendId, Function.identity()
-        ));
-        this.backendSelector = backendSelector;
-        this.executor = executor;
-    }
+	public ContentStorageHandler(ContentIndexDatabase contentIndex, Collection<StorageBackend> backends, StorageBackendSelector backendSelector, ScheduledExecutorService executor) {
+		this.index = contentIndex;
+		this.backends = backends.stream().collect(ImmutableMap.toImmutableMap(
+				StorageBackend::getBackendId, Function.identity()
+		));
+		this.backendSelector = backendSelector;
+		this.executor = executor;
+	}
 
-    /**
-     * Load content.
-     *
-     * @param key the key to load
-     * @return the loaded content
-     */
-    @Override
-    public @NonNull Content load(String key) {
-        // query the index to see if content with this key is stored
-        Content metadata = this.index.get(key);
-        if (metadata == null) {
-            return Content.EMPTY_CONTENT;
-        }
+	/**
+	 * Load content.
+	 *
+	 * @param key the key to load
+	 * @return the loaded content
+	 */
+	@Override
+	public @NonNull Content load(String key) {
+		// query the index to see if content with this key is stored
+		Content metadata = this.index.get(key);
+		if (metadata == null) {
+			return Content.EMPTY_CONTENT;
+		}
 
-        // find the backend that the content is stored in
-        String backendId = metadata.getBackendId();
+		// find the backend that the content is stored in
+		String backendId = metadata.getBackendId();
 
-        StorageBackend backend = this.backends.get(backendId);
-        if (backend == null) {
-            LOGGER.error("Unable to load " + key + " - no such backend '" + backendId + "'");
-            return Content.EMPTY_CONTENT;
-        }
+		StorageBackend backend = this.backends.get(backendId);
+		if (backend == null) {
+			LOGGER.error("Unable to load " + key + " - no such backend '" + backendId + "'");
+			return Content.EMPTY_CONTENT;
+		}
 
-        // increment the read counter
-        READ_FROM_BACKEND_COUNTER.labels(backendId).inc();
-        LOGGER.info("[STORAGE] Loading '" + key + "' from the '" + backendId + "' backend");
+		// increment the read counter
+		READ_FROM_BACKEND_COUNTER.labels(backendId).inc();
+		LOGGER.info("[STORAGE] Loading '" + key + "' from the '" + backendId + "' backend");
 
-        // load the content from the backend
-        try {
-            Content content = backend.load(key);
-            if (content != null) {
-                return content;
-            }
-        } catch (Exception e) {
-            LOGGER.warn("[STORAGE] Unable to load '" + key + "' from the '" + backendId + "' backend", e);
-        }
+		// load the content from the backend
+		try {
+			Content content = backend.load(key);
+			if (content != null) {
+				return content;
+			}
+		} catch (Exception e) {
+			LOGGER.warn("[STORAGE] Unable to load '" + key + "' from the '" + backendId + "' backend", e);
+		}
 
-        return Content.EMPTY_CONTENT;
-    }
+		return Content.EMPTY_CONTENT;
+	}
 
-    /**
-     * Save content.
-     *
-     * @param content the content to save
-     */
-    public void save(Content content) {
-        // select a backend to store the content in
-        StorageBackend backend = this.backendSelector.select(content);
-        String backendId = backend.getBackendId();
+	/**
+	 * Save content.
+	 *
+	 * @param content the content to save
+	 */
+	public void save(Content content) {
+		// select a backend to store the content in
+		StorageBackend backend = this.backendSelector.select(content);
+		String backendId = backend.getBackendId();
 
-        // record which backend the content is going to be stored in, and write to the index
-        content.setBackendId(backend.getBackendId());
-        this.index.put(content);
+		// record which backend the content is going to be stored in, and write to the index
+		content.setBackendId(backend.getBackendId());
+		this.index.put(content);
 
-        // increment the write counter
-        WRITE_TO_BACKEND_COUNTER.labels(backendId).inc();
+		// increment the write counter
+		WRITE_TO_BACKEND_COUNTER.labels(backendId).inc();
 
-        // save to the backend
-        try {
-            backend.save(content);
-        } catch (Exception e) {
-            LOGGER.warn("[STORAGE] Unable to save '" + content.getKey() + "' to the '" + backendId + "' backend", e);
-        }
-    }
+		// save to the backend
+		try {
+			backend.save(content);
+		} catch (Exception e) {
+			LOGGER.warn("[STORAGE] Unable to save '" + content.getKey() + "' to the '" + backendId + "' backend", e);
+		}
+	}
 
-    /**
-     * Invalidates/deletes any expired content and updates the metrics gauges
-     */
-    public void runInvalidationAndRecordMetrics() {
-        // query the index for content which has expired
-        Collection<Content> expired = this.index.getExpired();
+	/**
+	 * Invalidates/deletes any expired content and updates the metrics gauges
+	 */
+	public void runInvalidationAndRecordMetrics() {
+		// query the index for content which has expired
+		Collection<Content> expired = this.index.getExpired();
 
-        for (Content metadata : expired) {
-            String key = metadata.getKey();
+		for (Content metadata : expired) {
+			String key = metadata.getKey();
 
-            // find the backend that the content is stored in
-            String backendId = metadata.getBackendId();
-            StorageBackend backend = this.backends.get(backendId);
-            if (backend == null) {
-                LOGGER.error("[STORAGE] Unable to delete " + key + " - no such backend '" + backendId + "'");
-                continue;
-            }
+			// find the backend that the content is stored in
+			String backendId = metadata.getBackendId();
+			StorageBackend backend = this.backends.get(backendId);
+			if (backend == null) {
+				LOGGER.error("[STORAGE] Unable to delete " + key + " - no such backend '" + backendId + "'");
+				continue;
+			}
 
-            // delete the data from the backend
-            try {
-                backend.delete(key);
-            } catch (Exception e) {
-                LOGGER.warn("[STORAGE] Unable to delete '" + key + "' from the '" + backend.getBackendId() + "' backend", e);
-            }
+			// delete the data from the backend
+			try {
+				backend.delete(key);
+			} catch (Exception e) {
+				LOGGER.warn("[STORAGE] Unable to delete '" + key + "' from the '" + backend.getBackendId() + "' backend", e);
+			}
 
-            // remove the entry from the index
-            this.index.remove(key);
+			// remove the entry from the index
+			this.index.remove(key);
 
-            LOGGER.info("[STORAGE] Deleted '" + key + "' from the '" + backendId + "' backend");
-        }
+			LOGGER.info("[STORAGE] Deleted '" + key + "' from the '" + backendId + "' backend");
+		}
 
-        // update metrics
-        this.index.recordMetrics();
-    }
+		// update metrics
+		this.index.recordMetrics();
+	}
 
-    public Executor getExecutor() {
-        return this.executor;
-    }
+	public Executor getExecutor() {
+		return this.executor;
+	}
 }

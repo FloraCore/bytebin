@@ -26,7 +26,9 @@
 package me.lucko.bytebin;
 
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
-
+import io.jooby.ExecutionMode;
+import io.jooby.Jooby;
+import io.prometheus.client.hotspot.DefaultExports;
 import me.lucko.bytebin.content.Content;
 import me.lucko.bytebin.content.ContentIndexDatabase;
 import me.lucko.bytebin.content.ContentLoader;
@@ -45,15 +47,10 @@ import me.lucko.bytebin.util.ExpiryHandler;
 import me.lucko.bytebin.util.RateLimitHandler;
 import me.lucko.bytebin.util.RateLimiter;
 import me.lucko.bytebin.util.TokenGenerator;
-
 import org.apache.logging.log4j.Level;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.apache.logging.log4j.io.IoBuilder;
-
-import io.jooby.ExecutionMode;
-import io.jooby.Jooby;
-import io.prometheus.client.hotspot.DefaultExports;
 
 import java.nio.file.Paths;
 import java.util.ArrayList;
@@ -67,151 +64,151 @@ import java.util.concurrent.TimeUnit;
  */
 public final class Bytebin implements AutoCloseable {
 
-    /**
-     * Logger instance
-     */
-    private static final Logger LOGGER;
+	/**
+	 * Logger instance
+	 */
+	private static final Logger LOGGER;
 
-    static {
-        EnvVars.read();
-        LOGGER = LogManager.getLogger(Bytebin.class);
-    }
+	static {
+		EnvVars.read();
+		LOGGER = LogManager.getLogger(Bytebin.class);
+	}
 
-    /**
-     * Executor service for performing file based i/o
-     */
-    private final ScheduledExecutorService executor;
-    private final ContentIndexDatabase indexDatabase;
-    /**
-     * The web server instance
-     */
-    private final BytebinServer server;
+	/**
+	 * Executor service for performing file based i/o
+	 */
+	private final ScheduledExecutorService executor;
+	private final ContentIndexDatabase indexDatabase;
+	/**
+	 * The web server instance
+	 */
+	private final BytebinServer server;
 
-    public Bytebin(Configuration config) throws Exception {
-        // setup simple logger
-        LOGGER.info("loading bytebin...");
+	public Bytebin(Configuration config) throws Exception {
+		// setup simple logger
+		LOGGER.info("loading bytebin...");
 
-        // setup executor
-        Thread.setDefaultUncaughtExceptionHandler(ExceptionHandler.INSTANCE);
-        this.executor = Executors.newScheduledThreadPool(
-                config.getInt(Option.EXECUTOR_POOL_SIZE, 16),
-                new ThreadFactoryBuilder().setNameFormat("bytebin-io-%d").build()
-        );
+		// setup executor
+		Thread.setDefaultUncaughtExceptionHandler(ExceptionHandler.INSTANCE);
+		this.executor = Executors.newScheduledThreadPool(
+				config.getInt(Option.EXECUTOR_POOL_SIZE, 16),
+				new ThreadFactoryBuilder().setNameFormat("bytebin-io-%d").build()
+		);
 
-        // setup storage backends
-        List<StorageBackend> storageBackends = new ArrayList<>();
+		// setup storage backends
+		List<StorageBackend> storageBackends = new ArrayList<>();
 
-        LocalDiskBackend localDiskBackend = new LocalDiskBackend("local", Paths.get("content"));
-        storageBackends.add(localDiskBackend);
+		LocalDiskBackend localDiskBackend = new LocalDiskBackend("local", Paths.get("content"));
+		storageBackends.add(localDiskBackend);
 
-        StorageBackendSelector backendSelector;
-        if (config.getBoolean(Option.S3, false)) {
-            S3Backend s3Backend = new S3Backend("s3", config.getString(Option.S3_BUCKET, "bytebin"));
-            storageBackends.add(s3Backend);
+		StorageBackendSelector backendSelector;
+		if (config.getBoolean(Option.S3, false)) {
+			S3Backend s3Backend = new S3Backend("s3", config.getString(Option.S3_BUCKET, "bytebin"));
+			storageBackends.add(s3Backend);
 
-            backendSelector = new StorageBackendSelector.IfExpiryGt(
-                    config.getInt(Option.S3_EXPIRY_THRESHOLD, 2880), // 2 days
-                    s3Backend,
-                    new StorageBackendSelector.IfSizeGt(
-                            config.getInt(Option.S3_SIZE_THRESHOLD, 100) * Content.KILOBYTE_LENGTH, // 100kb
-                            s3Backend,
-                            new StorageBackendSelector.Static(localDiskBackend)
-                    )
-            );
-        } else {
-            backendSelector = new StorageBackendSelector.Static(localDiskBackend);
-        }
+			backendSelector = new StorageBackendSelector.IfExpiryGt(
+					config.getInt(Option.S3_EXPIRY_THRESHOLD, 2880), // 2 days
+					s3Backend,
+					new StorageBackendSelector.IfSizeGt(
+							config.getInt(Option.S3_SIZE_THRESHOLD, 100) * Content.KILOBYTE_LENGTH, // 100kb
+							s3Backend,
+							new StorageBackendSelector.Static(localDiskBackend)
+					)
+			);
+		} else {
+			backendSelector = new StorageBackendSelector.Static(localDiskBackend);
+		}
 
-        this.indexDatabase = ContentIndexDatabase.initialise(storageBackends);
+		this.indexDatabase = ContentIndexDatabase.initialise(storageBackends);
 
-        ContentStorageHandler storageHandler = new ContentStorageHandler(this.indexDatabase, storageBackends, backendSelector, this.executor);
+		ContentStorageHandler storageHandler = new ContentStorageHandler(this.indexDatabase, storageBackends, backendSelector, this.executor);
 
-        ContentLoader contentLoader = ContentLoader.create(
-                storageHandler,
-                config.getInt(Option.CACHE_EXPIRY, 10),
-                config.getInt(Option.CACHE_MAX_SIZE, 200)
-        );
+		ContentLoader contentLoader = ContentLoader.create(
+				storageHandler,
+				config.getInt(Option.CACHE_EXPIRY, 10),
+				config.getInt(Option.CACHE_MAX_SIZE, 200)
+		);
 
-        ExpiryHandler expiryHandler = new ExpiryHandler(
-                config.getLong(Option.MAX_CONTENT_LIFETIME, -1), // never expire by default
-                config.getLongMap(Option.MAX_CONTENT_LIFETIME_USER_AGENTS)
-        );
+		ExpiryHandler expiryHandler = new ExpiryHandler(
+				config.getLong(Option.MAX_CONTENT_LIFETIME, -1), // never expire by default
+				config.getLongMap(Option.MAX_CONTENT_LIFETIME_USER_AGENTS)
+		);
 
-        boolean metrics = config.getBoolean(Option.METRICS, true);
-        if (metrics) {
-            DefaultExports.initialize();
-        }
+		boolean metrics = config.getBoolean(Option.METRICS, true);
+		if (metrics) {
+			DefaultExports.initialize();
+		}
 
-        // setup the web server
-        this.server = (BytebinServer) Jooby.createApp(new String[0], ExecutionMode.EVENT_LOOP, () -> new BytebinServer(
-                storageHandler,
-                contentLoader,
-                config.getString(Option.HOST, "0.0.0.0"),
-                config.getInt(Option.PORT, 8080),
-                metrics,
-                new RateLimitHandler(config.getStringList(Option.API_KEYS)),
-                new RateLimiter(
-                        // by default, allow posts at a rate of 30 times every 10 minutes (every 20s)
-                        config.getInt(Option.POST_RATE_LIMIT_PERIOD, 10),
-                        config.getInt(Option.POST_RATE_LIMIT, 30)
-                ),
-                new RateLimiter(
-                        // by default, allow updates at a rate of 20 times every 2 minutes (every 6s)
-                        config.getInt(Option.UPDATE_RATE_LIMIT_PERIOD, 2),
-                        config.getInt(Option.UPDATE_RATE_LIMIT, 20)
-                ),
-                new RateLimiter(
-                        // by default, allow reads at a rate of 30 times every 2 minutes (every 4s)
-                        config.getInt(Option.READ_RATE_LIMIT_PERIOD, 2),
-                        config.getInt(Option.READ_RATE_LIMIT, 30)
-                ),
-                new TokenGenerator(config.getInt(Option.KEY_LENGTH, 7)),
-                (Content.MEGABYTE_LENGTH * config.getInt(Option.MAX_CONTENT_LENGTH, 10)),
-                expiryHandler,
-                config.getStringMap(Option.HTTP_HOST_ALIASES)
-        ));
-        this.server.start();
+		// setup the web server
+		this.server = (BytebinServer) Jooby.createApp(new String[0], ExecutionMode.EVENT_LOOP, () -> new BytebinServer(
+				storageHandler,
+				contentLoader,
+				config.getString(Option.HOST, "0.0.0.0"),
+				config.getInt(Option.PORT, 8080),
+				metrics,
+				new RateLimitHandler(config.getStringList(Option.API_KEYS)),
+				new RateLimiter(
+						// by default, allow posts at a rate of 30 times every 10 minutes (every 20s)
+						config.getInt(Option.POST_RATE_LIMIT_PERIOD, 10),
+						config.getInt(Option.POST_RATE_LIMIT, 30)
+				),
+				new RateLimiter(
+						// by default, allow updates at a rate of 20 times every 2 minutes (every 6s)
+						config.getInt(Option.UPDATE_RATE_LIMIT_PERIOD, 2),
+						config.getInt(Option.UPDATE_RATE_LIMIT, 20)
+				),
+				new RateLimiter(
+						// by default, allow reads at a rate of 30 times every 2 minutes (every 4s)
+						config.getInt(Option.READ_RATE_LIMIT_PERIOD, 2),
+						config.getInt(Option.READ_RATE_LIMIT, 30)
+				),
+				new TokenGenerator(config.getInt(Option.KEY_LENGTH, 7)),
+				(Content.MEGABYTE_LENGTH * config.getInt(Option.MAX_CONTENT_LENGTH, 10)),
+				expiryHandler,
+				config.getStringMap(Option.HTTP_HOST_ALIASES)
+		));
+		this.server.start();
 
-        // schedule invalidation task
-        if (expiryHandler.hasExpiryTimes() || metrics) {
-            this.executor.scheduleWithFixedDelay(storageHandler::runInvalidationAndRecordMetrics, 5, 5, TimeUnit.MINUTES);
-        }
+		// schedule invalidation task
+		if (expiryHandler.hasExpiryTimes() || metrics) {
+			this.executor.scheduleWithFixedDelay(storageHandler::runInvalidationAndRecordMetrics, 5, 5, TimeUnit.MINUTES);
+		}
 
-        if (config.getBoolean(Option.AUDIT_ON_STARTUP, false)) {
-            this.executor.execute(new AuditTask(this.indexDatabase, storageBackends));
-        }
-    }
+		if (config.getBoolean(Option.AUDIT_ON_STARTUP, false)) {
+			this.executor.execute(new AuditTask(this.indexDatabase, storageBackends));
+		}
+	}
 
-    // Bootstrap
-    public static void main(String[] args) throws Exception {
-        // setup logging
-        System.setOut(IoBuilder.forLogger(LOGGER).setLevel(Level.INFO).buildPrintStream());
-        System.setErr(IoBuilder.forLogger(LOGGER).setLevel(Level.ERROR).buildPrintStream());
+	// Bootstrap
+	public static void main(String[] args) throws Exception {
+		// setup logging
+		System.setOut(IoBuilder.forLogger(LOGGER).setLevel(Level.INFO).buildPrintStream());
+		System.setErr(IoBuilder.forLogger(LOGGER).setLevel(Level.ERROR).buildPrintStream());
 
-        // setup a new bytebin instance
-        Configuration config = Configuration.load(Paths.get("config.json"));
-        try {
-            Bytebin bytebin = new Bytebin(config);
-            Runtime.getRuntime().addShutdownHook(new Thread(bytebin::close, "Bytebin Shutdown Thread"));
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-    }
+		// setup a new bytebin instance
+		Configuration config = Configuration.load(Paths.get("config.json"));
+		try {
+			Bytebin bytebin = new Bytebin(config);
+			Runtime.getRuntime().addShutdownHook(new Thread(bytebin::close, "Bytebin Shutdown Thread"));
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+	}
 
-    @Override
-    public void close() {
-        this.server.stop();
-        this.executor.shutdown();
-        try {
-            this.executor.awaitTermination(30, TimeUnit.SECONDS);
-        } catch (InterruptedException e) {
-            LOGGER.error("Exception whilst shutting down executor", e);
-        }
-        try {
-            this.indexDatabase.close();
-        } catch (Exception e) {
-            LOGGER.error("Exception whilst shutting down index database", e);
-        }
-    }
+	@Override
+	public void close() {
+		this.server.stop();
+		this.executor.shutdown();
+		try {
+			this.executor.awaitTermination(30, TimeUnit.SECONDS);
+		} catch (InterruptedException e) {
+			LOGGER.error("Exception whilst shutting down executor", e);
+		}
+		try {
+			this.indexDatabase.close();
+		} catch (Exception e) {
+			LOGGER.error("Exception whilst shutting down index database", e);
+		}
+	}
 
 }

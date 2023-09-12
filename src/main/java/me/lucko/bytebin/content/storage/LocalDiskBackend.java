@@ -27,7 +27,6 @@ package me.lucko.bytebin.content.storage;
 
 import me.lucko.bytebin.content.Content;
 import me.lucko.bytebin.util.ContentEncoding;
-
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -50,174 +49,174 @@ import java.util.stream.Stream;
  */
 public class LocalDiskBackend implements StorageBackend {
 
-    private static final Logger LOGGER = LogManager.getLogger(LocalDiskBackend.class);
+	private static final Logger LOGGER = LogManager.getLogger(LocalDiskBackend.class);
 
-    /**
-     * The id of the backend
-     */
-    private final String backendId;
+	/**
+	 * The id of the backend
+	 */
+	private final String backendId;
 
-    /**
-     * The path to the directory where the content is stored
-     */
-    private final Path contentPath;
+	/**
+	 * The path to the directory where the content is stored
+	 */
+	private final Path contentPath;
 
-    public LocalDiskBackend(String backendId, Path contentPath) throws IOException {
-        this.backendId = backendId;
-        this.contentPath = contentPath;
+	public LocalDiskBackend(String backendId, Path contentPath) throws IOException {
+		this.backendId = backendId;
+		this.contentPath = contentPath;
 
-        // initialise
-        Files.createDirectories(this.contentPath);
-    }
+		// initialise
+		Files.createDirectories(this.contentPath);
+	}
 
-    private static void write(Content c, OutputStream outputStream) throws IOException {
-        DataOutputStream out = new DataOutputStream(outputStream);
+	private static void write(Content c, OutputStream outputStream) throws IOException {
+		DataOutputStream out = new DataOutputStream(outputStream);
 
-        // write version
-        out.writeInt(2);
+		// write version
+		out.writeInt(2);
 
-        // write name
-        out.writeUTF(c.getKey());
+		// write name
+		out.writeUTF(c.getKey());
 
-        // write content type
-        byte[] contextType = c.getContentType().getBytes();
-        out.writeInt(contextType.length);
-        out.write(contextType);
+		// write content type
+		byte[] contextType = c.getContentType().getBytes();
+		out.writeInt(contextType.length);
+		out.write(contextType);
 
-        // write expiry time
-        out.writeLong(c.getExpiry() == null ? -1 : c.getExpiry().getTime());
+		// write expiry time
+		out.writeLong(c.getExpiry() == null ? -1 : c.getExpiry().getTime());
 
-        // write last modified
-        out.writeLong(c.getLastModified());
+		// write last modified
+		out.writeLong(c.getLastModified());
 
-        // write modifiable state data
-        out.writeBoolean(c.isModifiable());
-        if (c.isModifiable()) {
-            out.writeUTF(c.getAuthKey());
-        }
+		// write modifiable state data
+		out.writeBoolean(c.isModifiable());
+		if (c.isModifiable()) {
+			out.writeUTF(c.getAuthKey());
+		}
 
-        // write encoding
-        byte[] encoding = c.getEncoding().getBytes();
-        out.writeInt(encoding.length);
-        out.write(encoding);
+		// write encoding
+		byte[] encoding = c.getEncoding().getBytes();
+		out.writeInt(encoding.length);
+		out.write(encoding);
 
-        // write content
-        out.writeInt(c.getContent().length);
-        out.write(c.getContent());
-    }
+		// write content
+		out.writeInt(c.getContent().length);
+		out.write(c.getContent());
+	}
 
-    private static Content read(InputStream inputStream, boolean skipContent) throws IOException {
-        DataInputStream in = new DataInputStream(inputStream);
+	private static Content read(InputStream inputStream, boolean skipContent) throws IOException {
+		DataInputStream in = new DataInputStream(inputStream);
 
-        // read version
-        int version = in.readInt();
+		// read version
+		int version = in.readInt();
 
-        // read key
-        String key = in.readUTF();
+		// read key
+		String key = in.readUTF();
 
-        // read content type
-        byte[] contentTypeBytes = new byte[in.readInt()];
-        in.readFully(contentTypeBytes);
-        String contentType = new String(contentTypeBytes);
+		// read content type
+		byte[] contentTypeBytes = new byte[in.readInt()];
+		in.readFully(contentTypeBytes);
+		String contentType = new String(contentTypeBytes);
 
-        // read expiry
-        long expiry = in.readLong();
-        Date expiryDate = expiry == -1 ? null : new Date(expiry);
+		// read expiry
+		long expiry = in.readLong();
+		Date expiryDate = expiry == -1 ? null : new Date(expiry);
 
-        // read last modified time
-        long lastModified = in.readLong();
+		// read last modified time
+		long lastModified = in.readLong();
 
-        // read modifiable state data
-        boolean modifiable = in.readBoolean();
-        String authKey = null;
-        if (modifiable) {
-            authKey = in.readUTF();
-        }
+		// read modifiable state data
+		boolean modifiable = in.readBoolean();
+		String authKey = null;
+		if (modifiable) {
+			authKey = in.readUTF();
+		}
 
-        // read encoding
-        String encoding;
-        if (version == 1) {
-            encoding = ContentEncoding.GZIP;
-        } else {
-            byte[] encodingBytes = new byte[in.readInt()];
-            in.readFully(encodingBytes);
-            encoding = new String(encodingBytes);
-        }
+		// read encoding
+		String encoding;
+		if (version == 1) {
+			encoding = ContentEncoding.GZIP;
+		} else {
+			byte[] encodingBytes = new byte[in.readInt()];
+			in.readFully(encodingBytes);
+			encoding = new String(encodingBytes);
+		}
 
-        // read content
-        int contentLength = in.readInt();
+		// read content
+		int contentLength = in.readInt();
 
-        if (skipContent) {
-            Content content = new Content(key, contentType, expiryDate, lastModified, modifiable, authKey, encoding, Content.EMPTY_BYTES);
-            content.setContentLength(contentLength);
-            return content;
-        } else {
-            byte[] content = new byte[contentLength];
-            in.readFully(content);
-            return new Content(key, contentType, expiryDate, lastModified, modifiable, authKey, encoding, content);
-        }
+		if (skipContent) {
+			Content content = new Content(key, contentType, expiryDate, lastModified, modifiable, authKey, encoding, Content.EMPTY_BYTES);
+			content.setContentLength(contentLength);
+			return content;
+		} else {
+			byte[] content = new byte[contentLength];
+			in.readFully(content);
+			return new Content(key, contentType, expiryDate, lastModified, modifiable, authKey, encoding, content);
+		}
 
-    }
+	}
 
-    @Override
-    public String getBackendId() {
-        return this.backendId;
-    }
+	@Override
+	public String getBackendId() {
+		return this.backendId;
+	}
 
-    private Content load(Path resolved, boolean skipContent) throws IOException {
-        if (!Files.exists(resolved)) {
-            return null;
-        }
+	private Content load(Path resolved, boolean skipContent) throws IOException {
+		if (!Files.exists(resolved)) {
+			return null;
+		}
 
-        try (DataInputStream in = new DataInputStream(new BufferedInputStream(Files.newInputStream(resolved)))) {
-            Content content = read(in, skipContent);
-            content.setBackendId(this.backendId);
-            return content;
-        }
-    }
+		try (DataInputStream in = new DataInputStream(new BufferedInputStream(Files.newInputStream(resolved)))) {
+			Content content = read(in, skipContent);
+			content.setBackendId(this.backendId);
+			return content;
+		}
+	}
 
-    @Override
-    public Content load(String key) throws IOException {
-        Path path = this.contentPath.resolve(key);
-        return load(path, false);
-    }
+	@Override
+	public Content load(String key) throws IOException {
+		Path path = this.contentPath.resolve(key);
+		return load(path, false);
+	}
 
-    @Override
-    public void save(Content c) throws IOException {
-        Path path = this.contentPath.resolve(c.getKey());
-        try (BufferedOutputStream out = new BufferedOutputStream(Files.newOutputStream(path))) {
-            write(c, out);
-        }
-    }
+	@Override
+	public void save(Content c) throws IOException {
+		Path path = this.contentPath.resolve(c.getKey());
+		try (BufferedOutputStream out = new BufferedOutputStream(Files.newOutputStream(path))) {
+			write(c, out);
+		}
+	}
 
-    @Override
-    public Stream<String> listKeys() throws Exception {
-        return Files.list(this.contentPath).map(path -> path.getFileName().toString());
-    }
+	@Override
+	public Stream<String> listKeys() throws Exception {
+		return Files.list(this.contentPath).map(path -> path.getFileName().toString());
+	}
 
-    @Override
-    public Stream<Content> list() throws IOException {
-        return Files.list(this.contentPath)
-                .map(path -> {
-                    try {
-                        return load(path, true);
-                    } catch (IOException e) {
-                        LOGGER.error("Exception occurred loading meta for '" + path.getFileName().toString() + "'", e);
-                        return null;
-                    }
-                })
-                .filter(Objects::nonNull);
-    }
+	@Override
+	public Stream<Content> list() throws IOException {
+		return Files.list(this.contentPath)
+				.map(path -> {
+					try {
+						return load(path, true);
+					} catch (IOException e) {
+						LOGGER.error("Exception occurred loading meta for '" + path.getFileName().toString() + "'", e);
+						return null;
+					}
+				})
+				.filter(Objects::nonNull);
+	}
 
-    @Override
-    public void delete(String key) throws IOException {
-        Path path = this.contentPath.resolve(key);
-        try {
-            Files.delete(path);
-        } catch (NoSuchFileException e) {
-            // ignore
-        }
-    }
+	@Override
+	public void delete(String key) throws IOException {
+		Path path = this.contentPath.resolve(key);
+		try {
+			Files.delete(path);
+		} catch (NoSuchFileException e) {
+			// ignore
+		}
+	}
 
 }
 

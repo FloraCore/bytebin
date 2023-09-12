@@ -38,163 +38,163 @@ import java.util.concurrent.CompletableFuture;
 @DatabaseTable(tableName = "content")
 public final class Content {
 
-    /**
-     * Empty byte array
-     */
-    public static final byte[] EMPTY_BYTES = new byte[0];
+	/**
+	 * Empty byte array
+	 */
+	public static final byte[] EMPTY_BYTES = new byte[0];
 
-    /**
-     * Empty content instance
-     */
-    public static final Content EMPTY_CONTENT = new Content(null, "text/plain", null, Long.MIN_VALUE, false, null, "", EMPTY_BYTES);
+	/**
+	 * Empty content instance
+	 */
+	public static final Content EMPTY_CONTENT = new Content(null, "text/plain", null, Long.MIN_VALUE, false, null, "", EMPTY_BYTES);
 
-    /**
-     * Number of bytes in a megabyte
-     */
-    public static final long MEGABYTE_LENGTH = 1024L * 1024L;
+	/**
+	 * Number of bytes in a megabyte
+	 */
+	public static final long MEGABYTE_LENGTH = 1024L * 1024L;
 
-    /**
-     * Number of bytes in a kilobyte
-     */
-    public static final long KILOBYTE_LENGTH = 1024L;
-    // future that is completed after the content has been saved to disk
-    private final CompletableFuture<Void> saveFuture = new CompletableFuture<>();
-    /**
-     * The key used to identify the content
-     */
-    @DatabaseField(columnName = "key", id = true, canBeNull = false)
-    private String key;
-    /**
-     * The type of the content
-     */
-    @DatabaseField(columnName = "content_type", index = true)
-    private String contentType;
-    /**
-     * The time when the content will expire
-     */
-    @DatabaseField(columnName = "expiry", dataType = DataType.DATE_INTEGER, index = true)
-    private Date expiry;
-    /**
-     * The time when the content was last modified in unix millis
-     */
-    @DatabaseField(columnName = "last_modified")
-    private long lastModified;
-    /**
-     * If the content can be modified using PUT requests
-     */
-    private boolean modifiable;
-    /**
-     * The auth key required to modify the content
-     */
-    private String authKey;
-    /**
-     * The 'Content-Encoding' used to encode this content
-     */
-    @DatabaseField(columnName = "encoding")
-    private String encoding;
-    /**
-     * The id of the backend currently storing this content - use null for unknown
-     */
-    @DatabaseField(columnName = "backend_id")
-    private String backendId;
-    /**
-     * The actual content, optional
-     */
-    private byte[] content;
-    /**
-     * The length of the content
-     */
-    @DatabaseField(columnName = "content_length")
-    private int contentLength;
+	/**
+	 * Number of bytes in a kilobyte
+	 */
+	public static final long KILOBYTE_LENGTH = 1024L;
+	// future that is completed after the content has been saved to disk
+	private final CompletableFuture<Void> saveFuture = new CompletableFuture<>();
+	/**
+	 * The key used to identify the content
+	 */
+	@DatabaseField(columnName = "key", id = true, canBeNull = false)
+	private String key;
+	/**
+	 * The type of the content
+	 */
+	@DatabaseField(columnName = "content_type", index = true)
+	private String contentType;
+	/**
+	 * The time when the content will expire
+	 */
+	@DatabaseField(columnName = "expiry", dataType = DataType.DATE_INTEGER, index = true)
+	private Date expiry;
+	/**
+	 * The time when the content was last modified in unix millis
+	 */
+	@DatabaseField(columnName = "last_modified")
+	private long lastModified;
+	/**
+	 * If the content can be modified using PUT requests
+	 */
+	private boolean modifiable;
+	/**
+	 * The auth key required to modify the content
+	 */
+	private String authKey;
+	/**
+	 * The 'Content-Encoding' used to encode this content
+	 */
+	@DatabaseField(columnName = "encoding")
+	private String encoding;
+	/**
+	 * The id of the backend currently storing this content - use null for unknown
+	 */
+	@DatabaseField(columnName = "backend_id")
+	private String backendId;
+	/**
+	 * The actual content, optional
+	 */
+	private byte[] content;
+	/**
+	 * The length of the content
+	 */
+	@DatabaseField(columnName = "content_length")
+	private int contentLength;
 
-    public Content(String key, String contentType, Date expiry, long lastModified, boolean modifiable, String authKey, String encoding, byte[] content) {
-        this.key = key;
-        this.contentType = contentType;
-        this.expiry = expiry;
-        this.lastModified = lastModified;
-        this.modifiable = modifiable;
-        this.authKey = authKey;
-        this.encoding = encoding;
-        this.content = content;
-        this.contentLength = content.length;
-    }
+	public Content(String key, String contentType, Date expiry, long lastModified, boolean modifiable, String authKey, String encoding, byte[] content) {
+		this.key = key;
+		this.contentType = contentType;
+		this.expiry = expiry;
+		this.lastModified = lastModified;
+		this.modifiable = modifiable;
+		this.authKey = authKey;
+		this.encoding = encoding;
+		this.content = content;
+		this.contentLength = content.length;
+	}
 
-    // for ormlite
-    Content() {
+	// for ormlite
+	Content() {
 
-    }
+	}
 
-    public String getKey() {
-        return this.key;
-    }
+	public String getKey() {
+		return this.key;
+	}
 
-    public String getContentType() {
-        return this.contentType;
-    }
+	public String getContentType() {
+		return this.contentType;
+	}
 
-    public void setContentType(String contentType) {
-        this.contentType = contentType;
-    }
+	public void setContentType(String contentType) {
+		this.contentType = contentType;
+	}
 
-    public Date getExpiry() {
-        return this.expiry;
-    }
+	public Date getExpiry() {
+		return this.expiry;
+	}
 
-    public void setExpiry(Date expiry) {
-        this.expiry = expiry;
-    }
+	public void setExpiry(Date expiry) {
+		this.expiry = expiry;
+	}
 
-    public long getLastModified() {
-        return this.lastModified;
-    }
+	public long getLastModified() {
+		return this.lastModified;
+	}
 
-    public void setLastModified(long lastModified) {
-        this.lastModified = lastModified;
-    }
+	public void setLastModified(long lastModified) {
+		this.lastModified = lastModified;
+	}
 
-    public boolean isModifiable() {
-        return this.modifiable;
-    }
+	public boolean isModifiable() {
+		return this.modifiable;
+	}
 
-    public String getAuthKey() {
-        return this.authKey;
-    }
+	public String getAuthKey() {
+		return this.authKey;
+	}
 
-    public String getEncoding() {
-        return this.encoding;
-    }
+	public String getEncoding() {
+		return this.encoding;
+	}
 
-    public void setEncoding(String encoding) {
-        this.encoding = encoding;
-    }
+	public void setEncoding(String encoding) {
+		this.encoding = encoding;
+	}
 
-    public String getBackendId() {
-        return this.backendId;
-    }
+	public String getBackendId() {
+		return this.backendId;
+	}
 
-    public void setBackendId(String backendId) {
-        this.backendId = backendId;
-    }
+	public void setBackendId(String backendId) {
+		this.backendId = backendId;
+	}
 
-    public byte[] getContent() {
-        return this.content;
-    }
+	public byte[] getContent() {
+		return this.content;
+	}
 
-    public void setContent(byte[] content) {
-        this.content = content;
-        this.contentLength = content.length;
-    }
+	public void setContent(byte[] content) {
+		this.content = content;
+		this.contentLength = content.length;
+	}
 
-    public int getContentLength() {
-        return this.contentLength;
-    }
+	public int getContentLength() {
+		return this.contentLength;
+	}
 
-    public void setContentLength(int contentLength) {
-        this.contentLength = contentLength;
-    }
+	public void setContentLength(int contentLength) {
+		this.contentLength = contentLength;
+	}
 
-    public CompletableFuture<Void> getSaveFuture() {
-        return this.saveFuture;
-    }
+	public CompletableFuture<Void> getSaveFuture() {
+		return this.saveFuture;
+	}
 
 }

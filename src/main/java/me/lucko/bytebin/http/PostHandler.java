@@ -25,6 +25,12 @@
 
 package me.lucko.bytebin.http;
 
+import io.jooby.Context;
+import io.jooby.MediaType;
+import io.jooby.Route;
+import io.jooby.StatusCode;
+import io.jooby.exception.StatusCodeException;
+import io.prometheus.client.Summary;
 import me.lucko.bytebin.content.Content;
 import me.lucko.bytebin.content.ContentLoader;
 import me.lucko.bytebin.content.ContentStorageHandler;
@@ -34,168 +40,159 @@ import me.lucko.bytebin.util.Gzip;
 import me.lucko.bytebin.util.RateLimitHandler;
 import me.lucko.bytebin.util.RateLimiter;
 import me.lucko.bytebin.util.TokenGenerator;
-
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
-import io.jooby.Context;
-import io.jooby.MediaType;
-import io.jooby.Route;
-import io.jooby.StatusCode;
-import io.jooby.exception.StatusCodeException;
-import io.prometheus.client.Summary;
-
+import javax.annotation.Nonnull;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 
-import javax.annotation.Nonnull;
-
 public final class PostHandler implements Route.Handler {
 
-    public static final Summary CONTENT_SIZE_SUMMARY = Summary.build()
-            .name("bytebin_content_size_bytes")
-            .help("The size of posted content")
-            .labelNames("useragent")
-            .register();
-    /**
-     * Logger instance
-     */
-    private static final Logger LOGGER = LogManager.getLogger(PostHandler.class);
-    private final BytebinServer server;
-    private final RateLimiter rateLimiter;
-    private final RateLimitHandler rateLimitHandler;
+	public static final Summary CONTENT_SIZE_SUMMARY = Summary.build()
+			.name("bytebin_content_size_bytes")
+			.help("The size of posted content")
+			.labelNames("useragent")
+			.register();
+	/**
+	 * Logger instance
+	 */
+	private static final Logger LOGGER = LogManager.getLogger(PostHandler.class);
+	private final BytebinServer server;
+	private final RateLimiter rateLimiter;
+	private final RateLimitHandler rateLimitHandler;
 
-    private final ContentStorageHandler storageHandler;
-    private final ContentLoader contentLoader;
-    private final TokenGenerator contentTokenGenerator;
-    private final TokenGenerator authKeyTokenGenerator;
-    private final long maxContentLength;
-    private final ExpiryHandler expiryHandler;
-    private final Map<String, String> hostAliases;
+	private final ContentStorageHandler storageHandler;
+	private final ContentLoader contentLoader;
+	private final TokenGenerator contentTokenGenerator;
+	private final TokenGenerator authKeyTokenGenerator;
+	private final long maxContentLength;
+	private final ExpiryHandler expiryHandler;
+	private final Map<String, String> hostAliases;
 
-    public PostHandler(BytebinServer server, RateLimiter rateLimiter, RateLimitHandler rateLimitHandler, ContentStorageHandler storageHandler, ContentLoader contentLoader, TokenGenerator contentTokenGenerator, long maxContentLength, ExpiryHandler expiryHandler, Map<String, String> hostAliases) {
-        this.server = server;
-        this.rateLimiter = rateLimiter;
-        this.rateLimitHandler = rateLimitHandler;
-        this.storageHandler = storageHandler;
-        this.contentLoader = contentLoader;
-        this.contentTokenGenerator = contentTokenGenerator;
-        this.authKeyTokenGenerator = new TokenGenerator(32);
-        this.maxContentLength = maxContentLength;
-        this.expiryHandler = expiryHandler;
-        this.hostAliases = hostAliases;
-    }
+	public PostHandler(BytebinServer server, RateLimiter rateLimiter, RateLimitHandler rateLimitHandler, ContentStorageHandler storageHandler, ContentLoader contentLoader, TokenGenerator contentTokenGenerator, long maxContentLength, ExpiryHandler expiryHandler, Map<String, String> hostAliases) {
+		this.server = server;
+		this.rateLimiter = rateLimiter;
+		this.rateLimitHandler = rateLimitHandler;
+		this.storageHandler = storageHandler;
+		this.contentLoader = contentLoader;
+		this.contentTokenGenerator = contentTokenGenerator;
+		this.authKeyTokenGenerator = new TokenGenerator(32);
+		this.maxContentLength = maxContentLength;
+		this.expiryHandler = expiryHandler;
+		this.hostAliases = hostAliases;
+	}
 
-    @Override
-    public String apply(@Nonnull Context ctx) {
-        byte[] content = ctx.body().bytes();
+	@Override
+	public String apply(@Nonnull Context ctx) {
+		byte[] content = ctx.body().bytes();
 
-        // ensure something was actually posted
-        if (content == null || content.length == 0) {
-            throw new StatusCodeException(StatusCode.BAD_REQUEST, "Missing content");
-        }
+		// ensure something was actually posted
+		if (content == null || content.length == 0) {
+			throw new StatusCodeException(StatusCode.BAD_REQUEST, "Missing content");
+		}
 
-        // check rate limits
-        String ipAddress = this.rateLimitHandler.getIpAddressAndCheckRateLimit(ctx, this.rateLimiter);
+		// check rate limits
+		String ipAddress = this.rateLimitHandler.getIpAddressAndCheckRateLimit(ctx, this.rateLimiter);
 
-        // determine the content type
-        String contentType = ctx.header("Content-Type").value("text/plain");
+		// determine the content type
+		String contentType = ctx.header("Content-Type").value("text/plain");
 
-        // generate a key
-        String key = this.contentTokenGenerator.generate();
+		// generate a key
+		String key = this.contentTokenGenerator.generate();
 
-        // get the content encodings
-        // https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Content-Encoding
-        List<String> encodings = ContentEncoding.getContentEncoding(ctx.header("Content-Encoding").valueOrNull());
+		// get the content encodings
+		// https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Content-Encoding
+		List<String> encodings = ContentEncoding.getContentEncoding(ctx.header("Content-Encoding").valueOrNull());
 
-        // get the user agent & origin headers
-        String userAgent = ctx.header("User-Agent").value("null");
-        String origin = ctx.header("Origin").value("null");
-        String host = ctx.getHostAndPort();
+		// get the user agent & origin headers
+		String userAgent = ctx.header("User-Agent").value("null");
+		String origin = ctx.header("Origin").value("null");
+		String host = ctx.getHostAndPort();
 
-        Date expiry = this.expiryHandler.getExpiry(userAgent, origin, host);
+		Date expiry = this.expiryHandler.getExpiry(userAgent, origin, host);
 
-        // check max content length
-        if (content.length > this.maxContentLength) {
-            throw new StatusCodeException(StatusCode.REQUEST_ENTITY_TOO_LARGE, "Content too large");
-        }
+		// check max content length
+		if (content.length > this.maxContentLength) {
+			throw new StatusCodeException(StatusCode.REQUEST_ENTITY_TOO_LARGE, "Content too large");
+		}
 
-        // check for our custom Allow-Modification header
-        boolean allowModifications = ctx.header("Allow-Modification").booleanValue(false);
-        String authKey;
-        if (allowModifications) {
-            authKey = this.authKeyTokenGenerator.generate();
-        } else {
-            authKey = null;
-        }
+		// check for our custom Allow-Modification header
+		boolean allowModifications = ctx.header("Allow-Modification").booleanValue(false);
+		String authKey;
+		if (allowModifications) {
+			authKey = this.authKeyTokenGenerator.generate();
+		} else {
+			authKey = null;
+		}
 
-        LOGGER.info("[POST]\n" +
-                "    key = " + key + "\n" +
-                "    type = " + contentType + "\n" +
-                "    user agent = " + userAgent + "\n" +
-                "    ip = " + ipAddress + "\n" +
-                (origin.equals("null") ? "" : "    origin = " + origin + "\n") +
-                "    content size = " + String.format("%,d", content.length / 1024) + " KB\n" +
-                "    encoding = " + encodings.toString() + "\n"
-        );
+		LOGGER.info("[POST]\n" +
+				"    key = " + key + "\n" +
+				"    type = " + contentType + "\n" +
+				"    user agent = " + userAgent + "\n" +
+				"    ip = " + ipAddress + "\n" +
+				(origin.equals("null") ? "" : "    origin = " + origin + "\n") +
+				"    content size = " + String.format("%,d", content.length / 1024) + " KB\n" +
+				"    encoding = " + encodings.toString() + "\n"
+		);
 
-        // metrics
-        String metricsLabel = BytebinServer.getMetricsLabel(ctx);
-        BytebinServer.recordRequest("POST", metricsLabel);
-        CONTENT_SIZE_SUMMARY.labels(metricsLabel).observe(content.length);
+		// metrics
+		String metricsLabel = BytebinServer.getMetricsLabel(ctx);
+		BytebinServer.recordRequest("POST", metricsLabel);
+		CONTENT_SIZE_SUMMARY.labels(metricsLabel).observe(content.length);
 
-        // record the content in the cache
-        CompletableFuture<Content> future = new CompletableFuture<>();
-        this.contentLoader.put(key, future);
+		// record the content in the cache
+		CompletableFuture<Content> future = new CompletableFuture<>();
+		this.contentLoader.put(key, future);
 
-        // check whether the content should be compressed by bytebin before saving
-        boolean compressServerSide = encodings.isEmpty();
-        if (compressServerSide) {
-            encodings.add(ContentEncoding.GZIP);
-        }
+		// check whether the content should be compressed by bytebin before saving
+		boolean compressServerSide = encodings.isEmpty();
+		if (compressServerSide) {
+			encodings.add(ContentEncoding.GZIP);
+		}
 
-        String encoding = String.join(",", encodings);
-        this.storageHandler.getExecutor().execute(() -> {
-            byte[] buf = content;
-            if (compressServerSide) {
-                buf = Gzip.compress(buf);
-            }
+		String encoding = String.join(",", encodings);
+		this.storageHandler.getExecutor().execute(() -> {
+			byte[] buf = content;
+			if (compressServerSide) {
+				buf = Gzip.compress(buf);
+			}
 
-            // add directly to the cache
-            // it's quite likely that the file will be requested only a few seconds after it is uploaded
-            Content c = new Content(key, contentType, expiry, System.currentTimeMillis(), authKey != null, authKey, encoding, buf);
-            future.complete(c);
+			// add directly to the cache
+			// it's quite likely that the file will be requested only a few seconds after it is uploaded
+			Content c = new Content(key, contentType, expiry, System.currentTimeMillis(), authKey != null, authKey, encoding, buf);
+			future.complete(c);
 
-            try {
-                this.storageHandler.save(c);
-            } finally {
-                c.getSaveFuture().complete(null);
-            }
-        });
+			try {
+				this.storageHandler.save(c);
+			} finally {
+				c.getSaveFuture().complete(null);
+			}
+		});
 
-        // return the url location as plain content
-        ctx.setResponseCode(StatusCode.CREATED);
+		// return the url location as plain content
+		ctx.setResponseCode(StatusCode.CREATED);
 
-        if (allowModifications) {
-            ctx.setResponseHeader("Modification-Key", authKey);
-        }
+		if (allowModifications) {
+			ctx.setResponseHeader("Modification-Key", authKey);
+		}
 
-        if (ctx.getMethod().equals("PUT")) {
-            // PUT: return the URL where the content can be accessed
-            host = this.hostAliases.getOrDefault(host, host);
-            String location = "https://" + host + "/" + key;
+		if (ctx.getMethod().equals("PUT")) {
+			// PUT: return the URL where the content can be accessed
+			host = this.hostAliases.getOrDefault(host, host);
+			String location = "https://" + host + "/" + key;
 
-            ctx.setResponseHeader("Location", location);
-            ctx.setResponseType(MediaType.TEXT);
-            return location + "\n";
-        } else {
-            // POST: return the key
-            ctx.setResponseHeader("Location", key);
-            ctx.setResponseType(MediaType.JSON);
-            return "{\"key\":\"" + key + "\"}";
-        }
-    }
+			ctx.setResponseHeader("Location", location);
+			ctx.setResponseType(MediaType.TEXT);
+			return location + "\n";
+		} else {
+			// POST: return the key
+			ctx.setResponseHeader("Location", key);
+			ctx.setResponseType(MediaType.JSON);
+			return "{\"key\":\"" + key + "\"}";
+		}
+	}
 
 }

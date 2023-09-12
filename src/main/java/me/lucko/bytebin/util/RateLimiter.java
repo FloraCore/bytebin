@@ -35,24 +35,24 @@ import java.util.concurrent.atomic.AtomicInteger;
  * Handles a rate limit
  */
 public class RateLimiter {
-    /**
-     * Rate limiter cache - allow x "actions" every x minutes
-     */
-    private final LoadingCache<String, AtomicInteger> rateLimiter;
-    /**
-     * The number of actions allowed in each period
-     */
-    private final int actionsPerCycle;
+	/**
+	 * Rate limiter cache - allow x "actions" every x minutes
+	 */
+	private final LoadingCache<String, AtomicInteger> rateLimiter;
+	/**
+	 * The number of actions allowed in each period
+	 */
+	private final int actionsPerCycle;
 
-    public RateLimiter(int periodMins, int actionsPerCycle) {
-        this.rateLimiter = Caffeine.newBuilder()
-                .expireAfterWrite(periodMins, TimeUnit.MINUTES)
-                .build(key -> new AtomicInteger(0));
-        this.actionsPerCycle = actionsPerCycle;
-    }
+	public RateLimiter(int periodMins, int actionsPerCycle) {
+		this.rateLimiter = Caffeine.newBuilder()
+				.expireAfterWrite(periodMins, TimeUnit.MINUTES)
+				.build(key -> new AtomicInteger(0));
+		this.actionsPerCycle = actionsPerCycle;
+	}
 
-    public boolean check(String ipAddress) {
-        //noinspection ConstantConditions
-        return this.rateLimiter.get(ipAddress).incrementAndGet() > this.actionsPerCycle;
-    }
+	public boolean check(String ipAddress) {
+		//noinspection ConstantConditions
+		return this.rateLimiter.get(ipAddress).incrementAndGet() > this.actionsPerCycle;
+	}
 }

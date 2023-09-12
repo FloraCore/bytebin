@@ -25,17 +25,6 @@
 
 package me.lucko.bytebin.http;
 
-import me.lucko.bytebin.Bytebin;
-import me.lucko.bytebin.content.ContentLoader;
-import me.lucko.bytebin.content.ContentStorageHandler;
-import me.lucko.bytebin.util.ExpiryHandler;
-import me.lucko.bytebin.util.RateLimitHandler;
-import me.lucko.bytebin.util.RateLimiter;
-import me.lucko.bytebin.util.TokenGenerator;
-
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
-
 import io.jooby.AssetHandler;
 import io.jooby.AssetSource;
 import io.jooby.Context;
@@ -48,6 +37,15 @@ import io.jooby.ServerOptions;
 import io.jooby.StatusCode;
 import io.jooby.exception.StatusCodeException;
 import io.prometheus.client.Counter;
+import me.lucko.bytebin.Bytebin;
+import me.lucko.bytebin.content.ContentLoader;
+import me.lucko.bytebin.content.ContentStorageHandler;
+import me.lucko.bytebin.util.ExpiryHandler;
+import me.lucko.bytebin.util.RateLimitHandler;
+import me.lucko.bytebin.util.RateLimiter;
+import me.lucko.bytebin.util.TokenGenerator;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 import java.time.Duration;
 import java.util.Map;
@@ -55,113 +53,113 @@ import java.util.concurrent.CompletionException;
 
 public class BytebinServer extends Jooby {
 
-    /**
-     * Logger instance
-     */
-    private static final Logger LOGGER = LogManager.getLogger(BytebinServer.class);
+	/**
+	 * Logger instance
+	 */
+	private static final Logger LOGGER = LogManager.getLogger(BytebinServer.class);
 
-    private static final Counter REQUESTS_COUNTER = Counter.build()
-            .name("bytebin_requests_total")
-            .help("The amount of requests handled")
-            .labelNames("method", "useragent")
-            .register();
+	private static final Counter REQUESTS_COUNTER = Counter.build()
+			.name("bytebin_requests_total")
+			.help("The amount of requests handled")
+			.labelNames("method", "useragent")
+			.register();
 
-    public BytebinServer(ContentStorageHandler storageHandler, ContentLoader contentLoader, String host, int port, boolean metrics, RateLimitHandler rateLimitHandler, RateLimiter postRateLimiter, RateLimiter putRateLimiter, RateLimiter readRateLimiter, TokenGenerator contentTokenGenerator, long maxContentLength, ExpiryHandler expiryHandler, Map<String, String> hostAliases) {
-        ServerOptions serverOpts = new ServerOptions();
-        serverOpts.setHost(host);
-        serverOpts.setPort(port);
-        serverOpts.setCompressionLevel(null);
-        serverOpts.setMaxRequestSize((int) maxContentLength);
-        setServerOptions(serverOpts);
+	public BytebinServer(ContentStorageHandler storageHandler, ContentLoader contentLoader, String host, int port, boolean metrics, RateLimitHandler rateLimitHandler, RateLimiter postRateLimiter, RateLimiter putRateLimiter, RateLimiter readRateLimiter, TokenGenerator contentTokenGenerator, long maxContentLength, ExpiryHandler expiryHandler, Map<String, String> hostAliases) {
+		ServerOptions serverOpts = new ServerOptions();
+		serverOpts.setHost(host);
+		serverOpts.setPort(port);
+		serverOpts.setCompressionLevel(null);
+		serverOpts.setMaxRequestSize((int) maxContentLength);
+		setServerOptions(serverOpts);
 
-        setExecutionMode(ExecutionMode.EVENT_LOOP);
-        setTrustProxy(true);
+		setExecutionMode(ExecutionMode.EVENT_LOOP);
+		setTrustProxy(true);
 
-        // catch all errors & just return some generic error message
-        error((ctx, cause, code) -> {
-            Throwable rootCause = cause;
-            while (rootCause instanceof CompletionException && rootCause.getCause() != null) {
-                rootCause = rootCause.getCause();
-            }
+		// catch all errors & just return some generic error message
+		error((ctx, cause, code) -> {
+			Throwable rootCause = cause;
+			while (rootCause instanceof CompletionException && rootCause.getCause() != null) {
+				rootCause = rootCause.getCause();
+			}
 
-            if (rootCause instanceof StatusCodeException) {
-                // handle expected errors
-                ctx.setResponseCode(((StatusCodeException) rootCause).getStatusCode())
-                        .setResponseType(MediaType.TEXT)
-                        .send(rootCause.getMessage());
-            } else {
-                // handle unexpected errors: log stack trace and send a generic response
-                LOGGER.error("Error thrown by handler", cause);
-                ctx.setResponseCode(StatusCode.NOT_FOUND)
-                        .setResponseType(MediaType.TEXT)
-                        .send("Invalid path");
-            }
-        });
+			if (rootCause instanceof StatusCodeException) {
+				// handle expected errors
+				ctx.setResponseCode(((StatusCodeException) rootCause).getStatusCode())
+						.setResponseType(MediaType.TEXT)
+						.send(rootCause.getMessage());
+			} else {
+				// handle unexpected errors: log stack trace and send a generic response
+				LOGGER.error("Error thrown by handler", cause);
+				ctx.setResponseCode(StatusCode.NOT_FOUND)
+						.setResponseType(MediaType.TEXT)
+						.send("Invalid path");
+			}
+		});
 
-        AssetSource wwwFiles = AssetSource.create(Bytebin.class.getClassLoader(), "/www/");
-        AssetSource fourOhFour = path -> {
-            throw new StatusCodeException(StatusCode.NOT_FOUND, "Not found");
-        };
+		AssetSource wwwFiles = AssetSource.create(Bytebin.class.getClassLoader(), "/www/");
+		AssetSource fourOhFour = path -> {
+			throw new StatusCodeException(StatusCode.NOT_FOUND, "Not found");
+		};
 
-        // serve index page or favicon, otherwise 404
-        assets("/*", new AssetHandler(wwwFiles, fourOhFour).setMaxAge(Duration.ofDays(1)));
+		// serve index page or favicon, otherwise 404
+		assets("/*", new AssetHandler(wwwFiles, fourOhFour).setMaxAge(Duration.ofDays(1)));
 
-        // healthcheck endpoint
-        get("/health", ctx -> {
-            ctx.setResponseHeader("Cache-Control", "no-cache");
-            return "{\"status\":\"ok\"}";
-        });
+		// healthcheck endpoint
+		get("/health", ctx -> {
+			ctx.setResponseHeader("Cache-Control", "no-cache");
+			return "{\"status\":\"ok\"}";
+		});
 
-        // metrics endpoint
-        if (metrics) {
-            get("/metrics", new MetricsHandler());
-        }
+		// metrics endpoint
+		if (metrics) {
+			get("/metrics", new MetricsHandler());
+		}
 
-        // define route handlers
-        routes(() -> {
-            decorator(new CorsHandler(new Cors()
-                    .setUseCredentials(false)
-                    .setMaxAge(Duration.ofDays(1))
-                    .setMethods("POST", "PUT")
-                    .setHeaders("Content-Type", "Accept", "Origin", "Content-Encoding", "Allow-Modification")));
+		// define route handlers
+		routes(() -> {
+			decorator(new CorsHandler(new Cors()
+					.setUseCredentials(false)
+					.setMaxAge(Duration.ofDays(1))
+					.setMethods("POST", "PUT")
+					.setHeaders("Content-Type", "Accept", "Origin", "Content-Encoding", "Allow-Modification")));
 
-            PostHandler postHandler = new PostHandler(this, postRateLimiter, rateLimitHandler, storageHandler, contentLoader, contentTokenGenerator, maxContentLength, expiryHandler, hostAliases);
-            post("/post", postHandler);
-            put("/post", postHandler);
-        });
+			PostHandler postHandler = new PostHandler(this, postRateLimiter, rateLimitHandler, storageHandler, contentLoader, contentTokenGenerator, maxContentLength, expiryHandler, hostAliases);
+			post("/post", postHandler);
+			put("/post", postHandler);
+		});
 
-        routes(() -> {
-            decorator(new CorsHandler(new Cors()
-                    .setUseCredentials(false)
-                    .setMaxAge(Duration.ofDays(1))
-                    .setMethods("GET", "PUT")
-                    .setHeaders("Content-Type", "Accept", "Origin", "Content-Encoding", "Authorization")));
+		routes(() -> {
+			decorator(new CorsHandler(new Cors()
+					.setUseCredentials(false)
+					.setMaxAge(Duration.ofDays(1))
+					.setMethods("GET", "PUT")
+					.setHeaders("Content-Type", "Accept", "Origin", "Content-Encoding", "Authorization")));
 
-            get("/{id:[a-zA-Z0-9]+}", new GetHandler(this, readRateLimiter, rateLimitHandler, contentLoader));
-            put("/{id:[a-zA-Z0-9]+}", new PutHandler(this, putRateLimiter, rateLimitHandler, storageHandler, contentLoader, maxContentLength, expiryHandler));
-        });
-    }
+			get("/{id:[a-zA-Z0-9]+}", new GetHandler(this, readRateLimiter, rateLimitHandler, contentLoader));
+			put("/{id:[a-zA-Z0-9]+}", new PutHandler(this, putRateLimiter, rateLimitHandler, storageHandler, contentLoader, maxContentLength, expiryHandler));
+		});
+	}
 
-    public static String getMetricsLabel(Context ctx) {
-        String origin = ctx.header("Origin").valueOrNull();
-        if (origin != null) {
-            return origin;
-        }
+	public static String getMetricsLabel(Context ctx) {
+		String origin = ctx.header("Origin").valueOrNull();
+		if (origin != null) {
+			return origin;
+		}
 
-        String userAgent = ctx.header("User-Agent").valueOrNull();
-        if (userAgent != null) {
-            return userAgent;
-        }
+		String userAgent = ctx.header("User-Agent").valueOrNull();
+		if (userAgent != null) {
+			return userAgent;
+		}
 
-        return "unknown";
-    }
+		return "unknown";
+	}
 
-    public static void recordRequest(String method, Context ctx) {
-        recordRequest(method, getMetricsLabel(ctx));
-    }
+	public static void recordRequest(String method, Context ctx) {
+		recordRequest(method, getMetricsLabel(ctx));
+	}
 
-    public static void recordRequest(String method, String metricsLabel) {
-        REQUESTS_COUNTER.labels(method, metricsLabel).inc();
-    }
+	public static void recordRequest(String method, String metricsLabel) {
+		REQUESTS_COUNTER.labels(method, metricsLabel).inc();
+	}
 
 }
